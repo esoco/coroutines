@@ -1,0 +1,86 @@
+apply plugin: 'java'
+apply plugin: 'osgi'
+apply plugin: 'eclipse'
+
+project.group   = 'de.esoco'
+
+sourceCompatibility = 1.8
+
+repositories
+{
+    jcenter()
+}
+
+tasks.withType(JavaCompile) {
+	// enable compilation of internal sun classes
+	// see http://stackoverflow.com/questions/12554829/
+    options.compilerArgs << '-XDignore.symbol.file'
+    options.fork = true
+    options.forkOptions.executable = 'javac'
+}
+
+dependencies
+{
+ 	if (project(':objectrelations').getProjectDir().exists())
+	{
+		compile project(':objectrelations')
+	}
+	else
+	{
+		compile 'org.obrel:objectrelations:1.2.3'
+	}
+
+    testCompile 'junit:junit:4.+'
+}
+
+task sourceJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives sourceJar
+    archives javadocJar
+}
+
+tasks.withType(Javadoc) {
+    failOnError = false
+    options.addBooleanOption('quiet', true)
+    
+    if (JavaVersion.current().isJava8Compatible()) {
+        options.addBooleanOption('Xdoclint:none', true) 
+    }
+}
+
+// ----------- Bintray Release -----------
+
+buildscript {
+    repositories { jcenter() }
+    dependencies { classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7' }
+}
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'maven'
+
+bintray {
+	user = project.hasProperty('bintrayUser') ?
+				project.property('bintrayUser') :
+				System.getenv('BINTRAY_USER')
+	key = project.hasProperty('bintrayApiKey') ?
+				project.property('bintrayApiKey') :
+				System.getenv('BINTRAY_API_KEY')
+    configurations = ['archives']
+    publish = true
+
+	pkg {
+		repo = 'sdack'
+		name = project.name
+		version {
+			name = project.version
+	    }
+    }
+}

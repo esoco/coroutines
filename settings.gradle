@@ -1,0 +1,17 @@
+rootProject.name = "coroutines"
+
+buildscript {
+    repositories { jcenter()
+    			   maven { url 'https://plugins.gradle.org/m2/' }
+    }
+    dependencies { classpath 'gradle.plugin.net.vivin:gradle-semantic-build-versioning:4.0.0' }
+}
+
+apply plugin: 'net.vivin.gradle-semantic-build-versioning'
+
+def baseProjects = [':esoco-common',':objectrelations']
+
+baseProjects.each { projectName ->
+	include projectName
+	project(projectName).projectDir = new File("../sdack/${projectName.substring(1)}")
+}
