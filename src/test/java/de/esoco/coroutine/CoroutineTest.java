@@ -37,7 +37,7 @@ import static de.esoco.coroutine.step.CodeExecution.run;
 import static de.esoco.coroutine.step.CodeExecution.supply;
 import static de.esoco.coroutine.step.Condition.doIf;
 import static de.esoco.coroutine.step.Condition.doIfElse;
-import static de.esoco.coroutine.step.Iteration.forEach;
+import static de.esoco.coroutine.step.Iteration.collectEachInto;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -247,9 +247,9 @@ public class CoroutineTest
 			Coroutine.first(apply((String s) ->
 		 						Arrays.asList(s.split(","))))
 					 .then(
-		 				forEach(
-		 					apply((String s) -> s.toUpperCase()),
-		 					() -> new LinkedList<>()));
+		 				collectEachInto(
+		 					() -> new LinkedList<>(),
+		 					apply((String s) -> s.toUpperCase())));
 
 		launch(
 			run ->
