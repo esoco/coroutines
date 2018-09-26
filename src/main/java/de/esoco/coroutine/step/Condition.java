@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,28 +37,27 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private final BiPredicate<? super I, Continuation<?>> fCondition;
-
-	private CoroutineStep<I, O> rRunIfTrue;
-	private CoroutineStep<I, O> rRunIfFalse = null;
+	private final BiPredicate<? super I, Continuation<?>> pCondition;
+	private final CoroutineStep<I, O>					  rRunIfTrue;
+	private final CoroutineStep<I, O>					  rRunIfFalse;
 
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
 	 * Creates a new instance.
 	 *
-	 * @param fCondition  The condition to test
+	 * @param pCondition  The condition to test
 	 * @param rRunIfTrue  The step to run if the condition is TRUE
 	 * @param rRunIfFalse The step to run if the condition is FALSE
 	 */
-	public Condition(BiPredicate<? super I, Continuation<?>> fCondition,
+	public Condition(BiPredicate<? super I, Continuation<?>> pCondition,
 					 CoroutineStep<I, O>					 rRunIfTrue,
 					 CoroutineStep<I, O>					 rRunIfFalse)
 	{
-		Objects.requireNonNull(fCondition);
+		Objects.requireNonNull(pCondition);
 		Objects.requireNonNull(rRunIfTrue);
 
-		this.fCondition  = fCondition;
+		this.pCondition  = pCondition;
 		this.rRunIfTrue  = rRunIfTrue;
 		this.rRunIfFalse = rRunIfFalse;
 	}
@@ -179,7 +178,7 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	 */
 	public Condition<I, O> orElse(CoroutineStep<I, O> rRunIfFalse)
 	{
-		return new Condition<>(fCondition, rRunIfTrue, rRunIfFalse);
+		return new Condition<>(pCondition, rRunIfTrue, rRunIfFalse);
 	}
 
 	/***************************************
@@ -194,7 +193,7 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 			i ->
 			{
 				CoroutineStep<I, O> rStep =
-					fCondition.test(i, rContinuation) ? rRunIfTrue
+					pCondition.test(i, rContinuation) ? rRunIfTrue
 													  : rRunIfFalse;
 
 				if (rStep != null)
@@ -204,7 +203,7 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 				}
 				else
 				{
-					terminateCoroutine(rContinuation);
+					rContinuation.getCoroutine().terminate(rContinuation);
 				}
 			},
 			rContinuation);
@@ -218,7 +217,7 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	{
 		O rResult = null;
 
-		if (fCondition.test(rInput, rContinuation))
+		if (pCondition.test(rInput, rContinuation))
 		{
 			rResult = rRunIfTrue.runBlocking(rInput, rContinuation);
 		}

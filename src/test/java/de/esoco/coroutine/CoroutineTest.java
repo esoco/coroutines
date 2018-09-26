@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +16,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
-import de.esoco.coroutine.ChannelId;
-import de.esoco.coroutine.Continuation;
-import de.esoco.coroutine.Coroutine;
-import de.esoco.coroutine.CoroutineScope;
-import de.esoco.coroutine.CoroutineScopeException;
 import de.esoco.coroutine.step.Condition;
 import de.esoco.coroutine.step.Iteration;
 
@@ -32,6 +27,7 @@ import java.util.concurrent.CancellationException;
 import org.junit.Test;
 
 import static de.esoco.coroutine.ChannelId.stringChannel;
+import static de.esoco.coroutine.Coroutine.first;
 import static de.esoco.coroutine.CoroutineScope.launch;
 import static de.esoco.coroutine.step.CallSubroutine.call;
 import static de.esoco.coroutine.step.ChannelReceive.receive;
@@ -308,7 +304,7 @@ public class CoroutineTest
 	}
 
 	/***************************************
-	 * Test of coroutines with a single step.
+	 * Test of subroutine invocations.
 	 */
 	@Test
 	public void testSubroutine()
@@ -324,6 +320,41 @@ public class CoroutineTest
 
 				assertEquals(Integer.valueOf(12355), ca.getResult());
 				assertEquals(Integer.valueOf(12355), cb.getResult());
+				assertTrue(ca.isFinished());
+				assertTrue(cb.isFinished());
+			});
+	}
+
+	/***************************************
+	 * Test of early subroutine termination.
+	 */
+	@Test
+	public void testSubroutineTermination()
+	{
+		Coroutine<Boolean, String> cr =
+			first(
+				call(
+					first(
+						doIf(
+							(Boolean b) -> b == Boolean.TRUE,
+							supply(() -> "TRUE")))));
+
+		launch(
+			run ->
+			{
+				Continuation<String> ca = run.async(cr, false);
+				Continuation<String> cb = run.blocking(cr, false);
+
+				assertEquals(null, ca.getResult());
+				assertEquals(null, cb.getResult());
+				assertTrue(ca.isFinished());
+				assertTrue(cb.isFinished());
+
+				ca = run.async(cr, true);
+				cb = run.blocking(cr, true);
+
+				assertEquals("TRUE", ca.getResult());
+				assertEquals("TRUE", cb.getResult());
 				assertTrue(ca.isFinished());
 				assertTrue(cb.isFinished());
 			});

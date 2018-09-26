@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -255,6 +255,23 @@ public class Coroutine<I, O> extends RelatedObject
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
+	 * Terminates the asynchronous execution of this coroutine by invoking it's
+	 * last step with an input value of NULL. This method should be invoked by
+	 * steps that need to end the execution of their coroutine early (e.g. if a
+	 * condition is not met).
+	 *
+	 * @param rContinuation The continuation of the execution
+	 */
+	public void terminate(Continuation<?> rContinuation)
+	{
+		aCode.getLastStep()
+			 .runAsync(
+	 			CompletableFuture.supplyAsync(() -> null, rContinuation),
+	 			null,
+	 			rContinuation);
+	}
+
+	/***************************************
 	 * Returns a new coroutine that executes additional code after that of this
 	 * instance. This and the related methods serve as builders for complex
 	 * coroutines. The initial coroutine is created with the first step, either
@@ -446,6 +463,8 @@ public class Coroutine<I, O> extends RelatedObject
 			CompletableFuture<I> fExecution,
 			Continuation<?>		 rContinuation)
 		{
+			rContinuation.subroutineStarted(this);
+
 			getCode().runAsync(fExecution, null, rContinuation);
 		}
 
@@ -459,6 +478,8 @@ public class Coroutine<I, O> extends RelatedObject
 		 */
 		public O runBlocking(I rInput, Continuation<?> rContinuation)
 		{
+			rContinuation.subroutineStarted(this);
+
 			return getCode().runBlocking(rInput, rContinuation);
 		}
 	}
@@ -579,6 +600,23 @@ public class Coroutine<I, O> extends RelatedObject
 		}
 
 		/***************************************
+		 * Returns the last step in this chain.
+		 *
+		 * @return The last step
+		 */
+		CoroutineStep<?, ?> getLastStep()
+		{
+			if (rNextStep instanceof StepChain)
+			{
+				return ((StepChain<?, ?, ?>) rNextStep).getLastStep();
+			}
+			else
+			{
+				return rNextStep;
+			}
+		}
+
+		/***************************************
 		 * Returns an extended {@link StepChain} that invokes a certain step at
 		 * the end.
 		 *
@@ -676,6 +714,8 @@ public class Coroutine<I, O> extends RelatedObject
 							 CoroutineStep<O, ?>  rNextStep,
 							 Continuation<?>	  rContinuation)
 		{
+			rContinuation.subroutineFinished();
+
 			rReturnStep.runAsync(fPreviousExecution, rNextStep, rContinuation);
 		}
 
@@ -686,6 +726,8 @@ public class Coroutine<I, O> extends RelatedObject
 		@SuppressWarnings("unchecked")
 		protected O execute(I rResult, Continuation<?> rContinuation)
 		{
+			rContinuation.subroutineFinished();
+
 			return rReturnStep.execute(rResult, rContinuation);
 		}
 	}

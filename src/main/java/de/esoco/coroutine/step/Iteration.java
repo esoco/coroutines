@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -66,31 +66,33 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Iterates over each element in the {@link Iterator} of an {@link Iterable}
-	 * input value and processes the element with another step. The processed
-	 * values will be discarded, the returned step will always have a result of
-	 * NULL. The method {@link #forEach(CoroutineStep, Supplier)} can be used to
-	 * collect the processed values.
+	 * Iterates over the elements in an {@link Iterable} input value and
+	 * processes each element with another coroutine step. The processed values
+	 * will be discarded, the returned step will always have a result of NULL.
+	 * To collect the processed values {@link #forEach(CoroutineStep, Supplier)}
+	 * can be used instead.
 	 *
 	 * @param  rProcessingStep The step to process each value
 	 *
 	 * @return A new step instance
 	 */
-	public static <T, R, I extends Collection<T>, C extends Collection<R>> Iteration<T, R,
-																					 I, C>
-	forEach(CoroutineStep<T, R> rProcessingStep)
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static <T, I extends Iterable<T>> CoroutineStep<I, Void> forEach(
+		CoroutineStep<T, ?> rProcessingStep)
 	{
-		return new Iteration<>(rProcessingStep, null);
+		// needs to be raw as the actual return type of the processing step is
+		// not known; but as the processing results are discarded the type of
+		// the iteration step will be <I, ?> where the ? is forced to Void
+		return new Iteration(rProcessingStep, null);
 	}
 
 	/***************************************
-	 * Iterates over each element in the {@link Iterator} of an {@link Iterable}
-	 * input value, processes the element with another step, and collects the
-	 * result into a target collection. If invoked asynchronously each iteration
-	 * step will be invoked as a separate suspension, but sequentially for each
-	 * value returned by the iterator. After the iteration has completed the
-	 * coroutine continues with the next step with the collected values as it's
-	 * input.
+	 * Iterates over the elements in an {@link Iterable} input value, processes
+	 * each element with another coroutine step, and collects the resulting
+	 * values into a target collection. If invoked asynchronously each iteration
+	 * will be invoked as a separate suspension, but values are still processed
+	 * sequentially. After the iteration has completed the coroutine continues
+	 * with the next step with the collected values as it's input.
 	 *
 	 * @param  rProcessingStep    The step to process each value
 	 * @param  fCollectionFactory A supplier that returns a collection of the
@@ -98,8 +100,7 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	 *
 	 * @return A new step instance
 	 */
-	public static <T, R, I extends Iterable<T>, C extends Collection<R>> Iteration<T, R,
-																				   I, C>
+	public static <T, R, I extends Iterable<T>, C extends Collection<R>> CoroutineStep<I, C>
 	forEach(CoroutineStep<T, R> rProcessingStep, Supplier<C> fCollectionFactory)
 	{
 		return new Iteration<>(rProcessingStep, fCollectionFactory);

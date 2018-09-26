@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +16,12 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
+import de.esoco.coroutine.Coroutine.Subroutine;
+
 import de.esoco.lib.concurrent.RunLock;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -51,14 +55,16 @@ public class Continuation<T> extends RelatedObject implements Executor
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private final CoroutineScope  rScope;
-	private final Coroutine<?, T> rCoroutine;
-	private Function<T, ?>		  fRunWhenDone;
+	private final CoroutineScope rScope;
 
 	private T		  rResult    = null;
 	private boolean   bCancelled = false;
 	private boolean   bFinished  = false;
 	private Throwable eError     = null;
+
+	private Deque<Coroutine<?, ?>> aCoroutineStack = new ArrayDeque<>();
+
+	private Function<T, ?> fRunWhenDone;
 
 	private final CountDownLatch aFinishSignal		 = new CountDownLatch(1);
 	private final RunLock		 aPostProcessingLock = new RunLock();
@@ -74,9 +80,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 */
 	public Continuation(CoroutineScope rScope, Coroutine<?, T> rCoroutine)
 	{
-		this.rScope     = rScope;
-		this.rCoroutine = rCoroutine;
+		this.rScope = rScope;
 
+		aCoroutineStack.push(rCoroutine);
 		rScope.coroutineStarted(this);
 	}
 
@@ -122,16 +128,6 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
-	 * Returns the executed coroutine.
-	 *
-	 * @return The coroutine
-	 */
-	public final Coroutine<?, T> coroutine()
-	{
-		return rCoroutine;
-	}
-
-	/***************************************
 	 * Forwards the execution to the executor of the {@link CoroutineContext}.
 	 *
 	 * @see Executor#execute(Runnable)
@@ -169,6 +165,17 @@ public class Continuation<T> extends RelatedObject implements Executor
 	public final <C> Channel<C> getChannel(ChannelId<C> rId)
 	{
 		return context().getChannel(rId);
+	}
+
+	/***************************************
+	 * Returns either the root coroutine or, if subroutines have been started
+	 * from it, the currently executing subroutine.
+	 *
+	 * @return The currently executing coroutine
+	 */
+	public final Coroutine<?, ?> getCoroutine()
+	{
+		return aCoroutineStack.peek();
 	}
 
 	/***************************************
@@ -277,6 +284,8 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 */
 	void finish(T rResult)
 	{
+		assert aCoroutineStack.size() == 1;
+
 		this.rResult = rResult;
 
 		// lock ensures that setting of fRunWhenDone is correctly synchronized
@@ -290,5 +299,24 @@ public class Continuation<T> extends RelatedObject implements Executor
 		}
 
 		rScope.coroutineFinished(this);
+	}
+
+	/***************************************
+	 * Removes a subroutine from the coroutines stack when it has finished
+	 * execution.
+	 */
+	void subroutineFinished()
+	{
+		aCoroutineStack.pop();
+	}
+
+	/***************************************
+	 * Pushes a subroutine on the coroutines stack upon execution.
+	 *
+	 * @param rSubroutine The subroutine
+	 */
+	void subroutineStarted(Subroutine<?, ?, ?> rSubroutine)
+	{
+		aCoroutineStack.push(rSubroutine);
 	}
 }

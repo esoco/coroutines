@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -78,6 +78,18 @@ public abstract class CoroutineStep<I, O>
 	}
 
 	//~ Methods ----------------------------------------------------------------
+
+	/***************************************
+	 * Returns the name of this step. By default this is the class name without
+	 * package but that may be changed by certain subclasses or by setting it
+	 * explicitly with {@link Coroutine#then(String, CoroutineStep)}.
+	 *
+	 * @return The step name
+	 */
+	public String getName()
+	{
+		return sName;
+	}
 
 	/***************************************
 	 * Runs this execution step asynchronously as a continuation of a previous
@@ -203,16 +215,5 @@ public abstract class CoroutineStep<I, O>
 		rContinuation.fail(eError);
 
 		return null;
-	}
-
-	/***************************************
-	 * Allows subclasses to regularly terminate the coroutine that is executed
-	 * in the given continuation with a result of NULL.
-	 *
-	 * @param rContinuation The continuation to finish
-	 */
-	protected void terminateCoroutine(Continuation<?> rContinuation)
-	{
-		rContinuation.finish(null);
 	}
 }
