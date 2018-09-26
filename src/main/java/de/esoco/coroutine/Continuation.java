@@ -31,6 +31,9 @@ import java.util.concurrent.Future;
 import java.util.function.Function;
 
 import org.obrel.core.RelatedObject;
+import org.obrel.core.RelationType;
+
+import static de.esoco.coroutine.Coroutines.STACKTRACE_HANDLER;
 
 
 /********************************************************************
@@ -154,6 +157,8 @@ public class Continuation<T> extends RelatedObject implements Executor
 			this.eError = eError;
 			cancel();
 			rScope.fail(this);
+
+			getConfig(STACKTRACE_HANDLER).accept(eError);
 		}
 	}
 
@@ -165,6 +170,36 @@ public class Continuation<T> extends RelatedObject implements Executor
 	public final <C> Channel<C> getChannel(ChannelId<C> rId)
 	{
 		return context().getChannel(rId);
+	}
+
+	/***************************************
+	 * Returns the value of a configuration relation. The lookup has the
+	 * following precedence: coroutine -&gt; scope -&gt; context, meaning that a
+	 * configuration in the former overrides the latter.
+	 *
+	 * @param  rConfigType The configuraton relation type
+	 *
+	 * @return The config
+	 */
+	public <V> V getConfig(RelationType<V> rConfigType)
+	{
+		Coroutine<?, ?> rCoroutine = getCoroutine();
+		V			    rValue;
+
+		if (rCoroutine.hasRelation(rConfigType))
+		{
+			rValue = rCoroutine.get(rConfigType);
+		}
+		else if (rScope.hasRelation(rConfigType))
+		{
+			rValue = rScope.get(rConfigType);
+		}
+		else
+		{
+			rValue = rScope.context().get(rConfigType);
+		}
+
+		return rValue;
 	}
 
 	/***************************************
@@ -203,7 +238,14 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 			if (bCancelled)
 			{
-				throw new CancellationException();
+				if (eError != null)
+				{
+					throw new CompletionException(eError);
+				}
+				else
+				{
+					throw new CancellationException();
+				}
 			}
 
 			return rResult;

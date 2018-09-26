@@ -32,11 +32,12 @@ import static de.esoco.coroutine.step.CodeExecution.consume;
 /********************************************************************
  * A step that implements suspendable iteration over an {@link Iterable} input
  * value. Each value returned by the iterator will be processed with a separate
- * execution, allowing steps from other coroutines to run in parallel. The
- * processed values can either be discarded or collected for further processing.
- * The static factory methods {@link #forEach(CoroutineStep)} and {@link
- * #collectEachInto(Supplier, CoroutineStep)} create instances for both
- * scenarios.
+ * execution of a certain coroutine step (which may be a subroutine).
+ *
+ * <p>The static factory methods {@link #forEach(CoroutineStep)}, {@link
+ * #collectEach(CoroutineStep)}, and {@link #collectEachInto(Supplier,
+ * CoroutineStep)} create instances that either discard or collect the results
+ * of applying the iteration step.</p>
  *
  * @author eso
  */

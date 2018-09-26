@@ -18,6 +18,7 @@ package de.esoco.coroutine;
 
 import de.esoco.coroutine.step.Condition;
 import de.esoco.coroutine.step.Iteration;
+import de.esoco.coroutine.step.Loop;
 
 import java.util.Arrays;
 import java.util.List;
@@ -37,6 +38,7 @@ import static de.esoco.coroutine.step.CodeExecution.supply;
 import static de.esoco.coroutine.step.Condition.doIf;
 import static de.esoco.coroutine.step.Condition.doIfElse;
 import static de.esoco.coroutine.step.Iteration.collectEach;
+import static de.esoco.coroutine.step.Loop.loopWhile;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -255,6 +257,28 @@ public class CoroutineTest
 
 				assertEquals(Arrays.asList("A", "B", "C", "D"), ca.getResult());
 				assertEquals(Arrays.asList("A", "B", "C", "D"), cb.getResult());
+			});
+	}
+
+	/***************************************
+	 * Test of the {@link Loop} step.
+	 */
+	@Test
+	public void testLoop()
+	{
+		Coroutine<Integer, Integer> cr =
+			Coroutine.first(loopWhile(i -> i < 10, apply(i -> i + 1)));
+
+		launch(
+			run ->
+			{
+				Continuation<Integer> ca = run.async(cr, 1);
+				Continuation<Integer> cb = run.blocking(cr, 1);
+
+				assertEquals(Integer.valueOf(10), ca.getResult());
+				assertEquals(Integer.valueOf(10), cb.getResult());
+				assertTrue(ca.isFinished());
+				assertTrue(cb.isFinished());
 			});
 	}
 

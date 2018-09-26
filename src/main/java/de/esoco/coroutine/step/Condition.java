@@ -28,8 +28,8 @@ import java.util.function.Predicate;
 
 /********************************************************************
  * A {@link Coroutine} step that test a logical expression in the form of a
- * {@link Predicate} or {@link BiPredicate} and executes different code based on
- * the boolean result.
+ * {@link Predicate} or {@link BiPredicate} and executes certain steps (which
+ * may be a subroutines) based on the boolean result.
  *
  * @author eso
  */

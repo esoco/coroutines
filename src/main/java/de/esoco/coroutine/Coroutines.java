@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +17,12 @@
 package de.esoco.coroutine;
 
 import java.util.Objects;
+import java.util.function.Consumer;
+
+import org.obrel.core.RelationType;
+import org.obrel.core.RelationTypes;
+
+import static org.obrel.core.RelationTypes.newDefaultValueType;
 
 
 /********************************************************************
@@ -29,6 +35,15 @@ public class Coroutines
 	//~ Static fields/initializers ---------------------------------------------
 
 	private static CoroutineContext rDefaultContext = new CoroutineContext();
+
+	/** Config: Stacktrace handler for coroutine errors. */
+	public static final RelationType<Consumer<Throwable>> STACKTRACE_HANDLER =
+		newDefaultValueType(t ->{});
+
+	static
+	{
+		RelationTypes.init(Coroutines.class);
+	}
 
 	//~ Constructors -----------------------------------------------------------
 
