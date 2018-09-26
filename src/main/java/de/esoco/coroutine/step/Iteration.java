@@ -19,8 +19,10 @@ package de.esoco.coroutine.step;
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.CoroutineStep;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
@@ -66,6 +68,17 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	}
 
 	//~ Static methods ---------------------------------------------------------
+
+	/***************************************
+	 * Collects all processed elements into a list.
+	 *
+	 * @see #collectEachInto(Supplier, CoroutineStep)
+	 */
+	public static <T, R, I extends Iterable<T>> CoroutineStep<I, List<R>>
+	collectEach(CoroutineStep<T, R> rProcessingStep)
+	{
+		return collectEachInto(() -> new ArrayList<>(), rProcessingStep);
+	}
 
 	/***************************************
 	 * Iterates over the elements in an {@link Iterable} input value, processes

@@ -20,7 +20,6 @@ import de.esoco.coroutine.step.Condition;
 import de.esoco.coroutine.step.Iteration;
 
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 
@@ -37,7 +36,7 @@ import static de.esoco.coroutine.step.CodeExecution.run;
 import static de.esoco.coroutine.step.CodeExecution.supply;
 import static de.esoco.coroutine.step.Condition.doIf;
 import static de.esoco.coroutine.step.Condition.doIfElse;
-import static de.esoco.coroutine.step.Iteration.collectEachInto;
+import static de.esoco.coroutine.step.Iteration.collectEach;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -244,12 +243,9 @@ public class CoroutineTest
 	public void testIteration()
 	{
 		Coroutine<String, List<String>> cr =
-			Coroutine.first(apply((String s) ->
-		 						Arrays.asList(s.split(","))))
-					 .then(
-		 				collectEachInto(
-		 					() -> new LinkedList<>(),
-		 					apply((String s) -> s.toUpperCase())));
+			Coroutine.first(apply((String s) -> Arrays.asList(s.split(","))))
+					 .then(collectEach(apply((String s) ->
+		 							s.toUpperCase())));
 
 		launch(
 			run ->
