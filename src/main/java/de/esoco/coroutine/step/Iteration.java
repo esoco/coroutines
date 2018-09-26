@@ -51,14 +51,15 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	/***************************************
 	 * Creates a new instance.
 	 *
+	 * @param fCollectionFactory A supplier that returns a collection of the
+	 *                           target type to store the processed values in or
+	 *                           NULL for no collection
 	 * @param rProcessingStep    The step to be applied to each value returned
 	 *                           by the iterator
-	 * @param fCollectionFactory A supplier that returns a collection of the
-	 *                           target type to store the processed values in
 	 */
 	public Iteration(
-		CoroutineStep<T, R> rProcessingStep,
-		Supplier<C>			fCollectionFactory)
+		Supplier<C>			fCollectionFactory,
+		CoroutineStep<T, R> rProcessingStep)
 	{
 		this.rProcessingStep    = rProcessingStep;
 		this.fCollectionFactory = fCollectionFactory;
@@ -85,7 +86,7 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 		Supplier<C>			fCollectionFactory,
 		CoroutineStep<T, R> rProcessingStep)
 	{
-		return new Iteration<>(rProcessingStep, fCollectionFactory);
+		return new Iteration<>(fCollectionFactory, rProcessingStep);
 	}
 
 	/***************************************
@@ -106,7 +107,7 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 		// needs to be raw as the actual return type of the processing step is
 		// not known; but as the processing results are discarded the type of
 		// the iteration step will be <I, ?> where the ? is forced to Void
-		return new Iteration(rProcessingStep, null);
+		return new Iteration(null, rProcessingStep);
 	}
 
 	//~ Methods ----------------------------------------------------------------
