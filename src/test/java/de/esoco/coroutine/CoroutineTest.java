@@ -24,11 +24,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static de.esoco.coroutine.ChannelId.stringChannel;
 import static de.esoco.coroutine.Coroutine.first;
 import static de.esoco.coroutine.CoroutineScope.launch;
+import static de.esoco.coroutine.Coroutines.STACKTRACE_HANDLER;
 import static de.esoco.coroutine.step.CallSubroutine.call;
 import static de.esoco.coroutine.step.ChannelReceive.receive;
 import static de.esoco.coroutine.step.ChannelSend.send;
@@ -60,6 +62,18 @@ public class CoroutineTest
 		Coroutine.first(apply((String s) -> s + 5))
 				 .then(apply(s -> s.replaceAll("\\D", "")))
 				 .then(apply(s -> Integer.valueOf(s)));
+
+	//~ Static methods ---------------------------------------------------------
+
+	/***************************************
+	 * Test class setup.
+	 */
+	@BeforeClass
+	public static void setupClass()
+	{
+		// suppress stacktraces from error testing
+		Coroutines.getDefaultContext().set(STACKTRACE_HANDLER, t ->{});
+	}
 
 	//~ Methods ----------------------------------------------------------------
 

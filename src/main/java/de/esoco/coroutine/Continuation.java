@@ -158,7 +158,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 			cancel();
 			rScope.fail(this);
 
-			getConfig(STACKTRACE_HANDLER).accept(eError);
+			getConfigValue(STACKTRACE_HANDLER).accept(eError);
 		}
 	}
 
@@ -174,25 +174,32 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 	/***************************************
 	 * Returns the value of a configuration relation. The lookup has the
-	 * following precedence: coroutine -&gt; scope -&gt; context, meaning that a
-	 * configuration in the former overrides the latter.
+	 * precedence <i>continuation (this) -&gt; scope -&gt; coroutine -&gt;
+	 * context</i>, meaning that a configuration in an earlier stage overrides
+	 * the later ones. Coroutine steps that want to modify the configuration of
+	 * the coroutine they are running in should therefore set the configuration
+	 * value on the the continuation.
 	 *
 	 * @param  rConfigType The configuraton relation type
 	 *
-	 * @return The config
+	 * @return The configuration value
 	 */
-	public <V> V getConfig(RelationType<V> rConfigType)
+	public <V> V getConfigValue(RelationType<V> rConfigType)
 	{
 		Coroutine<?, ?> rCoroutine = getCoroutine();
 		V			    rValue;
 
-		if (rCoroutine.hasRelation(rConfigType))
+		if (hasRelation(rConfigType))
 		{
-			rValue = rCoroutine.get(rConfigType);
+			rValue = get(rConfigType);
 		}
 		else if (rScope.hasRelation(rConfigType))
 		{
 			rValue = rScope.get(rConfigType);
+		}
+		else if (rCoroutine.hasRelation(rConfigType))
+		{
+			rValue = rCoroutine.get(rConfigType);
 		}
 		else
 		{

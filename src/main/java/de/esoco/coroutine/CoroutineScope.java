@@ -29,10 +29,10 @@ import org.obrel.core.RelatedObject;
 
 /********************************************************************
  * A scope that manages one or more running coroutines. A new scope is created
- * through the factory method {@link #launch(CoroutineContext, ScopeBuilder)}.
- * It receives an instance of the functional interface {@link ScopeBuilder} and
- * blocks the invoking thread until all started coroutines have finished
- * execution (either successfully or with an exception).
+ * through the factory method {@link #launch(CoroutineContext, ScopeCode)}. It
+ * receives an instance of the functional interface {@link ScopeCode} and blocks
+ * the invoking thread until all started coroutines have finished execution
+ * (either successfully or with an exception).
  *
  * @author eso
  */
@@ -73,11 +73,11 @@ public class CoroutineScope extends RelatedObject
 	 * Creates a new scope for the launching of coroutines in the {@link
 	 * Coroutines#getDefaultContext() default context}.
 	 *
-	 * @param rBuilder The builder to invoke the launching methods
+	 * @param rCode The code to execute in the scope
 	 *
-	 * @see   #launch(CoroutineContext, ScopeBuilder)
+	 * @see   #launch(CoroutineContext, ScopeCode)
 	 */
-	public static void launch(ScopeBuilder rBuilder)
+	public static void launch(ScopeCode rBuilder)
 	{
 		launch(null, rBuilder);
 	}
@@ -87,34 +87,44 @@ public class CoroutineScope extends RelatedObject
 	 * specific context. This method will block the invoking thread until all
 	 * coroutines launched by the argument builder have terminated.
 	 *
-	 * <p>If one or more of the coroutines do not complete successfully by
-	 * throwing an exception this method will also throw a {@link
-	 * CoroutineScopeException} as soon as all other coroutines have terminated.
-	 * By default an error causes all other coroutines to be cancelled but that
-	 * can be changed with {@link #setCancelOnError(boolean)}. If any other
-	 * coroutines fail after the first error their continuations will also be
-	 * added to the exception.</p>
+	 * <p>If one or more of the coroutines or the scope code throw an exception
+	 * this method will throw a {@link CoroutineScopeException} as soon as all
+	 * other coroutines have terminated. By default an error causes all other
+	 * coroutines to be cancelled but that can be changed with {@link
+	 * #setCancelOnError(boolean)}. If any other coroutines fail after the first
+	 * error their continuations will also be added to the exception.</p>
 	 *
 	 * @param  rContext The coroutine context for the scope
-	 * @param  rBuilder The builder that starts the coroutines
+	 * @param  rCode    The code to execute in the scope
 	 *
 	 * @throws CoroutineScopeException If one or more of the executed coroutines
 	 *                                 failed
 	 */
-	public static void launch(CoroutineContext rContext, ScopeBuilder rBuilder)
+	public static void launch(CoroutineContext rContext, ScopeCode rCode)
 	{
-		CoroutineScope rScope = new CoroutineScope(rContext);
+		CoroutineScope aScope = new CoroutineScope(rContext);
 
-		rScope.context().scopeLaunched(rScope);
+		aScope.context().scopeLaunched(aScope);
 
-		rBuilder.buildScope(rScope);
-		rScope.await();
-
-		rScope.context().scopeFinished(rScope);
-
-		if (rScope.aFailedContinuations.size() > 0)
+		try
 		{
-			throw new CoroutineScopeException(rScope.aFailedContinuations);
+			rCode.runIn(aScope);
+		}
+		catch (Exception e)
+		{
+			throw new CoroutineScopeException(e, aScope.aFailedContinuations);
+		}
+		finally
+		{
+			// even on errors wait for all asynchronous invocations
+			// and finish the scope
+			aScope.await();
+			aScope.context().scopeFinished(aScope);
+		}
+
+		if (aScope.aFailedContinuations.size() > 0)
+		{
+			throw new CoroutineScopeException(aScope.aFailedContinuations);
 		}
 	}
 
@@ -325,7 +335,7 @@ public class CoroutineScope extends RelatedObject
 	 * Signals this scope that an error occurred during a certain coroutine
 	 * execution. This will cancel the execution of all coroutines in this scope
 	 * and throw a {@link CoroutineScopeException} from the {@link
-	 * #launch(ScopeBuilder)} methods.
+	 * #launch(ScopeCode)} methods.
 	 *
 	 * @param rContinuation The continuation that failed with an exception
 	 */
@@ -365,25 +375,28 @@ public class CoroutineScope extends RelatedObject
 	//~ Inner Interfaces -------------------------------------------------------
 
 	/********************************************************************
-	 * A functional interface that will be invoked to add coroutine invocations
-	 * when creating a new scope with {@link
-	 * CoroutineScope#launch(ScopeBuilder)}. Typically used in form of a lambda
-	 * expression or method reference.
+	 * A functional interface that will be executed in a scope that has been
+	 * launched with {@link CoroutineScope#launch(ScopeCode)}. It is typically
+	 * used in form of a lambda expression or method reference.
 	 *
 	 * @author eso
 	 */
 	@FunctionalInterface
-	public interface ScopeBuilder
+	public interface ScopeCode
 	{
 		//~ Methods ------------------------------------------------------------
 
 		/***************************************
-		 * Builds the {@link Coroutine} invocations in a {@link CoroutineScope}
-		 * by invoking methods like {@link CoroutineScope#async(Coroutine)} on
-		 * the argument scope.
+		 * Starts coroutines in the given {@link CoroutineScope} by invoking
+		 * methods like {@link CoroutineScope#async(Coroutine)} on it and
+		 * optionally also performs other operations, like processing the
+		 * results.
 		 *
-		 * @param rScope The scope to build
+		 * @param  rScope The scope to run in
+		 *
+		 * @throws Exception Executions may throw arbitrary exceptions which
+		 *                   will be handled by the scope
 		 */
-		public void buildScope(CoroutineScope rScope);
+		public void runIn(CoroutineScope rScope) throws Exception;
 	}
 }

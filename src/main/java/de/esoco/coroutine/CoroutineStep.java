@@ -20,6 +20,11 @@ import de.esoco.coroutine.step.CodeExecution;
 
 import java.util.concurrent.CompletableFuture;
 
+import org.obrel.core.FluentRelatable;
+import org.obrel.core.RelatedObject;
+
+import static org.obrel.type.StandardTypes.NAME;
+
 
 /********************************************************************
  * This is the base class for all execution steps of coroutines. For simple
@@ -49,12 +54,9 @@ import java.util.concurrent.CompletableFuture;
  *
  * @author eso
  */
-public abstract class CoroutineStep<I, O>
+public abstract class CoroutineStep<I, O> extends RelatedObject
+	implements FluentRelatable<CoroutineStep<I, O>>
 {
-	//~ Instance fields --------------------------------------------------------
-
-	String sName;
-
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
@@ -62,34 +64,10 @@ public abstract class CoroutineStep<I, O>
 	 */
 	protected CoroutineStep()
 	{
-		sName = getClass().getSimpleName();
-	}
-
-	/***************************************
-	 * Creates a new instance with a certain name. This constructor can be used
-	 * by subclasses that want to set another step name than the default (which
-	 * is the class name without package).
-	 *
-	 * @param sName A label that identifies this step in it's coroutine
-	 */
-	protected CoroutineStep(String sName)
-	{
-		this.sName = sName;
+		set(NAME, getClass().getSimpleName());
 	}
 
 	//~ Methods ----------------------------------------------------------------
-
-	/***************************************
-	 * Returns the name of this step. By default this is the class name without
-	 * package but that may be changed by certain subclasses or by setting it
-	 * explicitly with {@link Coroutine#then(String, CoroutineStep)}.
-	 *
-	 * @return The step name
-	 */
-	public String getName()
-	{
-		return sName;
-	}
 
 	/***************************************
 	 * Runs this execution step asynchronously as a continuation of a previous
@@ -184,7 +162,7 @@ public abstract class CoroutineStep<I, O>
 	@Override
 	public String toString()
 	{
-		return sName;
+		return get(NAME);
 	}
 
 	/***************************************

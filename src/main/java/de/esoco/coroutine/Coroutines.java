@@ -36,9 +36,12 @@ public class Coroutines
 
 	private static CoroutineContext rDefaultContext = new CoroutineContext();
 
-	/** Config: Stacktrace handler for coroutine errors. */
+	/**
+	 * Configuration: Stacktrace handler for coroutine errors. The default value
+	 * prints the stacktrace of a failed coroutine execution to the console.
+	 */
 	public static final RelationType<Consumer<Throwable>> STACKTRACE_HANDLER =
-		newDefaultValueType(t ->{});
+		newDefaultValueType((Consumer<Throwable>) (t -> t.printStackTrace()));
 
 	static
 	{

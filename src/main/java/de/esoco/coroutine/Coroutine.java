@@ -199,7 +199,7 @@ public class Coroutine<I, O> extends RelatedObject
 	{
 		Objects.requireNonNull(rFirstStep);
 
-		init(new StepChain<>(rFirstStep, new FinishStep<>()));
+		init(new StepChain<>(rFirstStep, new FinishStep<>()), null);
 	}
 
 	/***************************************
@@ -216,8 +216,7 @@ public class Coroutine<I, O> extends RelatedObject
 	 */
 	private Coroutine(Coroutine<I, O> rOther)
 	{
-		init(rOther.aCode);
-		ObjectRelations.copyRelations(rOther, this, true);
+		init(rOther.aCode, rOther);
 	}
 
 	/***************************************
@@ -232,8 +231,7 @@ public class Coroutine<I, O> extends RelatedObject
 	{
 		Objects.requireNonNull(rNextStep);
 
-		init(rOther.aCode.then(rNextStep));
-		ObjectRelations.copyRelations(rOther, this, true);
+		init(rOther.aCode.then(rNextStep), rOther);
 	}
 
 	//~ Static methods ---------------------------------------------------------
@@ -308,20 +306,17 @@ public class Coroutine<I, O> extends RelatedObject
 	 * A variant of {@link #then(CoroutineStep)} that also sets an explicit step
 	 * name. Naming steps can help debugging coroutines.
 	 *
-	 * @param  sLabel A name that identifies this step in this coroutine
-	 * @param  rStep  The step to execute
+	 * @param  sStepName A name that identifies this step in this coroutine
+	 * @param  rStep     The step to execute
 	 *
 	 * @return The new coroutine
 	 *
 	 * @see    #then(CoroutineStep)
 	 */
-	public <T> Coroutine<I, T> then(
-		String				sStepLabel,
-		CoroutineStep<O, T> rStep)
+	public <T> Coroutine<I, T> then(String				sStepName,
+									CoroutineStep<O, T> rStep)
 	{
-		rStep.sName = sStepLabel;
-
-		return then(rStep);
+		return then(rStep.with(NAME, sStepName));
 	}
 
 	/***************************************
@@ -344,15 +339,22 @@ public class Coroutine<I, O> extends RelatedObject
 	}
 
 	/***************************************
-	 * Initializes a new instance. Invoked from the constructors.
+	 * Initializes a new instance. Invoked from constructors.
 	 *
-	 * @param rCode The code to be executed
+	 * @param rCode  The code to be executed
+	 * @param rOther Another coroutine to copy configuration data from or NULL
+	 *               for none
 	 */
-	void init(StepChain<I, ?, O> rCode)
+	void init(StepChain<I, ?, O> rCode, Coroutine<?, ?> rOther)
 	{
 		aCode = rCode;
 
 		set(NAME, getClass().getSimpleName());
+
+		if (rOther != null)
+		{
+			ObjectRelations.copyRelations(rOther, this, true);
+		}
 	}
 
 	/***************************************
@@ -434,8 +436,10 @@ public class Coroutine<I, O> extends RelatedObject
 		//~ Constructors -------------------------------------------------------
 
 		/***************************************
-		 * Creates a new instance that invokes another coroutine as a subroutine
-		 * and then returns the control flow to another step.
+		 * Creates a new instance that invokes the code another coroutine as a
+		 * subroutine and then returns the control flow to a step in the
+		 * invoking subroutine. The code of the original coroutine will be
+		 * copied into this instance, not referenced directly.
 		 *
 		 * @param rCoroutine  The coroutine to invoke as a subroutine
 		 * @param rReturnStep The step to return to after the subroutine
@@ -447,7 +451,8 @@ public class Coroutine<I, O> extends RelatedObject
 		{
 			init(
 				rCoroutine.aCode.withLastStep(
-					new SubroutineReturn<>(rReturnStep)));
+					new SubroutineReturn<>(rReturnStep)),
+				null);
 		}
 
 		//~ Methods ------------------------------------------------------------

@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,15 +41,31 @@ public class CoroutineScopeException extends CompletionException
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance from the continuations of the failed coroutines.
-	 * The causing exception will be set to the error of the first element in
-	 * the argument collection.
+	 * Creates a new instance from the continuations of failed coroutines. The
+	 * causing exception will be set to the error of the first element in the
+	 * argument collection.
 	 *
 	 * @param rFailed The failed continuations
 	 */
 	public CoroutineScopeException(Collection<Continuation<?>> rFailed)
 	{
 		super(CollectionUtil.firstElementOf(rFailed).getError());
+
+		rFailedContinuations = rFailed;
+	}
+
+	/***************************************
+	 * Creates a new instance from an explicit causing exception and optional
+	 * continuations of failed coroutines.
+	 *
+	 * @param eCause  The causing exception
+	 * @param rFailed The failed continuations (optional)
+	 */
+	public CoroutineScopeException(
+		Throwable					eCause,
+		Collection<Continuation<?>> rFailed)
+	{
+		super(eCause);
 
 		rFailedContinuations = rFailed;
 	}
