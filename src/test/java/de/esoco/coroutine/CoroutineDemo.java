@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,14 +16,22 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
-import de.esoco.coroutine.Coroutine;
 import de.esoco.lib.logging.Profiler;
+
+import java.net.InetSocketAddress;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 
+import static de.esoco.coroutine.Coroutine.first;
 import static de.esoco.coroutine.CoroutineScope.launch;
 import static de.esoco.coroutine.step.CodeExecution.run;
+import static de.esoco.coroutine.step.nio.SocketReceive.receiveFrom;
+import static de.esoco.coroutine.step.nio.SocketSend.sendTo;
+
 import static de.esoco.lib.datatype.Range.from;
 
 
@@ -37,26 +45,13 @@ public class CoroutineDemo
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance.
-	 */
-	public static void demoCoroutineScope()
-	{
-		launch(
-			run ->
-		{
-			run.async(
-				Coroutine.first(run(() -> from(1).to(10).forEach(Math::sqrt))));
-		});
-	}
-
-	/***************************************
 	 * Runs coroutines parallel in threads and with asynchronous execution for
 	 * comparison.
 	 */
 	public static void demoParallelExecution()
 	{
 		Coroutine<Object, Void> cr =
-			Coroutine.first(run(() -> from(1).to(10).forEach(Math::sqrt)));
+			first(run(() -> from(1).to(10).forEach(Math::sqrt)));
 
 		int nThreadCount    = 100_000;
 		int nCoroutineCount = 100_000;
@@ -102,12 +97,48 @@ public class CoroutineDemo
 	}
 
 	/***************************************
+	 * Creates a new instance.
+	 */
+	public static void demoSocketCommunication()
+	{
+		InetSocketAddress server = new InetSocketAddress("example.com", 80);
+
+		Coroutine<ByteBuffer, ByteBuffer> cr =
+			first(sendTo(server)).then(receiveFrom(server));
+
+		launch(
+			run ->
+			{
+				ByteBuffer data = ByteBuffer.allocate(100_000);
+
+				data.put(
+					"GET /index.html HTTP/1.1\r\nHost: example.com\r\n\r\n"
+						.getBytes(StandardCharsets.US_ASCII));
+
+				data.flip();
+
+				ByteBuffer result = run.blocking(cr, data).getResult();
+
+				result.flip();
+
+				byte[] bytes = new byte[result.limit()];
+
+				result.get(bytes);
+
+				System.out.printf(
+					"RESPONSE: \n%s",
+					new String(bytes, StandardCharsets.UTF_8));
+			});
+	}
+
+	/***************************************
 	 * Main
 	 *
 	 * @param rArgs
 	 */
 	public static void main(String[] rArgs)
 	{
-		demoParallelExecution();
+//		demoParallelExecution();
+		demoSocketCommunication();
 	}
 }

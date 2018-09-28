@@ -1,0 +1,247 @@
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// This file is a part of the 'coroutines' project.
+// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	  http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+package de.esoco.coroutine.step.nio;
+
+import de.esoco.coroutine.Continuation;
+import de.esoco.coroutine.Coroutine;
+import de.esoco.coroutine.CoroutineStep;
+import de.esoco.coroutine.Suspension;
+import de.esoco.coroutine.step.nio.AsynchronousChannelStep.ChannelCallback;
+
+import java.io.IOException;
+
+import java.net.SocketAddress;
+
+import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousSocketChannel;
+import java.nio.channels.Channel;
+
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Future;
+import java.util.function.Function;
+
+import org.obrel.core.Relatable;
+import org.obrel.core.RelationType;
+import org.obrel.core.RelationTypes;
+import org.obrel.type.MetaTypes;
+
+import static org.obrel.core.RelationTypes.newType;
+
+
+/********************************************************************
+ * The base class for coroutine steps that perform communication through
+ * instances of {@link AsynchronousSocketChannel}.
+ *
+ * @author eso
+ */
+public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
+{
+	//~ Static fields/initializers ---------------------------------------------
+
+	/**
+	 * State: an {@link AsynchronousSocketChannel} that has been openened and
+	 * connected by an asynchronous execution.
+	 */
+	public static final RelationType<AsynchronousSocketChannel> SOCKET_CHANNEL =
+		newType();
+
+	static
+	{
+		RelationTypes.init(AsynchronousSocketStep.class);
+	}
+
+	//~ Instance fields --------------------------------------------------------
+
+	private final Function<Continuation<?>, SocketAddress> fGetSocketAddress;
+
+	//~ Constructors -----------------------------------------------------------
+
+	/***************************************
+	 * Creates a new instance.
+	 *
+	 * @param fGetSocketAddress A function that provides the target socket
+	 *                          address from the current continuation
+	 */
+	public AsynchronousSocketStep(
+		Function<Continuation<?>, SocketAddress> fGetSocketAddress)
+	{
+		Objects.requireNonNull(fGetSocketAddress);
+
+		this.fGetSocketAddress = fGetSocketAddress;
+	}
+
+	//~ Methods ----------------------------------------------------------------
+
+	/***************************************
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void runAsync(CompletableFuture<ByteBuffer> fPreviousExecution,
+						 CoroutineStep<ByteBuffer, ?>  rNextStep,
+						 Continuation<?>			   rContinuation)
+	{
+		fPreviousExecution.thenAcceptAsync(
+			b -> connectAsync(b, rNextStep.suspend(rContinuation)),
+			rContinuation);
+	}
+
+	/***************************************
+	 * Implementation of the {@link ChannelOperation} functional interface
+	 * method signature.
+	 *
+	 * @see ChannelOperation#execute(int, AsynchronousChannel, ByteBuffer,
+	 *      ChannelCallback)
+	 */
+	protected abstract boolean performAsyncOperation(
+		int													nBytesProcessed,
+		AsynchronousSocketChannel							rChannel,
+		ByteBuffer											rData,
+		ChannelCallback<Integer, AsynchronousSocketChannel> rCallback);
+
+	/***************************************
+	 * Must be implemented for the blocking execution of a step. It still
+	 * receives an {@link AsynchronousSocketChannel} which must be accessed with
+	 * the blocking API (like {@link Future#get()}).
+	 *
+	 * @param  aChannel The channel to perform the operation on
+	 * @param  rData    The byte buffer for the operation data
+	 *
+	 * @throws Exception Any kind of exception may be thrown
+	 */
+	protected abstract void performBlockingOperation(
+		AsynchronousSocketChannel aChannel,
+		ByteBuffer				  rData) throws Exception;
+
+	/***************************************
+	 * {@inheritDoc}
+	 */
+	@Override
+	protected ByteBuffer execute(
+		ByteBuffer		rData,
+		Continuation<?> rContinuation)
+	{
+		try
+		{
+			AsynchronousSocketChannel aChannel = getChannel(rContinuation);
+
+			if (aChannel.getRemoteAddress() == null)
+			{
+				aChannel.connect(getSocketAddress(rContinuation)).get();
+			}
+
+			performBlockingOperation(aChannel, rData);
+		}
+		catch (Exception e)
+		{
+			throw new CompletionException(e);
+		}
+
+		return rData;
+	}
+
+	/***************************************
+	 * Returns the channel to be used by this step. This first checks the state
+	 * for an existing {@link #SOCKET_CHANNEL} relation. If none exists a new
+	 * {@link AsynchronousSocketChannel} will be opened and stored in the state
+	 * object.
+	 *
+	 * @param  rContinuation rState A {@link Relatable} object to query for the
+	 *                       channel
+	 *
+	 * @return The channel
+	 *
+	 * @throws IOException If opening the channel fails
+	 */
+	protected AsynchronousSocketChannel getChannel(
+		Continuation<?> rContinuation) throws IOException
+	{
+		Coroutine<?, ?> rCoroutine = rContinuation.getCurrentCoroutine();
+
+		AsynchronousSocketChannel rChannel = rCoroutine.get(SOCKET_CHANNEL);
+
+		if (rChannel == null)
+		{
+			rChannel = AsynchronousSocketChannel.open();
+			rCoroutine.set(SOCKET_CHANNEL, rChannel)
+					  .annotate(MetaTypes.MANAGED);
+		}
+
+		return rChannel;
+	}
+
+	/***************************************
+	 * Returns the address of the socket to connect to.
+	 *
+	 * @param  rContinuation The current continuation
+	 *
+	 * @return The socket address
+	 */
+	protected SocketAddress getSocketAddress(Continuation<?> rContinuation)
+	{
+		return fGetSocketAddress.apply(rContinuation);
+	}
+
+	/***************************************
+	 * Opens and connects a {@link Channel} to the {@link SocketAddress} of this
+	 * step and then performs the channel operation asynchronously.
+	 *
+	 * @param rData       The byte buffer of the data to be processed
+	 * @param rSuspension The coroutine suspension to be resumed when the
+	 *                    operation is complete
+	 */
+	private void connectAsync(
+		ByteBuffer			   rData,
+		Suspension<ByteBuffer> rSuspension)
+	{
+		try
+		{
+			AsynchronousSocketChannel rChannel =
+				getChannel(rSuspension.continuation());
+
+			if (rChannel.getRemoteAddress() == null)
+			{
+				SocketAddress rSocketAddress =
+					fGetSocketAddress.apply(rSuspension.continuation());
+
+				rChannel.connect(
+					rSocketAddress,
+					rData,
+					new ChannelCallback<>(
+						rChannel,
+						rSuspension,
+						this::performAsyncOperation));
+			}
+			else
+			{
+				performAsyncOperation(
+					FIRST_OPERATION,
+					rChannel,
+					rData,
+					new ChannelCallback<>(
+						rChannel,
+						rSuspension,
+						this::performAsyncOperation));
+			}
+		}
+		catch (IOException e)
+		{
+			throw new CompletionException(e);
+		}
+	}
+}

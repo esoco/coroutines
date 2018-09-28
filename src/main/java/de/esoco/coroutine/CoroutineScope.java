@@ -26,6 +26,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.obrel.core.RelatedObject;
 
+import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
+import static de.esoco.coroutine.Coroutines.closeManagedResources;
+
 
 /********************************************************************
  * A scope that manages one or more running coroutines. A new scope is created
@@ -120,6 +123,7 @@ public class CoroutineScope extends RelatedObject
 			// and finish the scope
 			aScope.await();
 			aScope.context().scopeFinished(aScope);
+			closeManagedResources(aScope, aScope.get(EXCEPTION_HANDLER));
 		}
 
 		if (aScope.aFailedContinuations.size() > 0)

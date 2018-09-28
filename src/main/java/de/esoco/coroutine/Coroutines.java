@@ -19,8 +19,10 @@ package de.esoco.coroutine;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import org.obrel.core.Relatable;
 import org.obrel.core.RelationType;
 import org.obrel.core.RelationTypes;
+import org.obrel.type.MetaTypes;
 
 import static org.obrel.core.RelationTypes.newDefaultValueType;
 
@@ -37,10 +39,13 @@ public class Coroutines
 	private static CoroutineContext rDefaultContext = new CoroutineContext();
 
 	/**
-	 * Configuration: Stacktrace handler for coroutine errors. The default value
-	 * prints the stacktrace of a failed coroutine execution to the console.
+	 * Configuration: A handler for coroutine exceptions. The main purpose of
+	 * this is to process exception stacktraces when they occur. All coroutine
+	 * exceptions will also be available from the finished scope.The default
+	 * value prints the stacktrace of a failed coroutine execution to the
+	 * console.
 	 */
-	public static final RelationType<Consumer<Throwable>> STACKTRACE_HANDLER =
+	public static final RelationType<Consumer<Throwable>> EXCEPTION_HANDLER =
 		newDefaultValueType((Consumer<Throwable>) (t -> t.printStackTrace()));
 
 	static
@@ -58,6 +63,42 @@ public class Coroutines
 	}
 
 	//~ Static methods ---------------------------------------------------------
+
+	/***************************************
+	 * Iterates over all relations in the given state object that are annotated
+	 * with {@link MetaTypes#MANAGED} and closes them if they implement the
+	 * {@link AutoCloseable} interface. This is invoked automatically
+	 *
+	 * @param rState        The state relatable to check for managed resources
+	 * @param fErrorHandler A consumer for exceptions that occur when closing a
+	 *                      resource
+	 */
+	public static void closeManagedResources(
+		Relatable			rState,
+		Consumer<Throwable> fErrorHandler)
+	{
+		rState.streamRelations()
+			  .filter(
+	  			r ->
+	  				r.hasAnnotation(MetaTypes.MANAGED) &&
+	  				r.getTarget() != null)
+			  .forEach(
+	  			r ->
+	  		{
+	  			if (r instanceof AutoCloseable)
+	  			{
+	  				try
+	  				{
+	  					((AutoCloseable) r).close();
+	  					System.out.printf("Closed %s\n", r);
+	  				}
+	  				catch (Exception e)
+	  				{
+	  					fErrorHandler.accept(e);
+	  				}
+	  			}
+	  		});
+	}
 
 	/***************************************
 	 * Returns the default {@link CoroutineContext}.

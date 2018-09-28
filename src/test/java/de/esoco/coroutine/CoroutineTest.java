@@ -30,7 +30,7 @@ import org.junit.Test;
 import static de.esoco.coroutine.ChannelId.stringChannel;
 import static de.esoco.coroutine.Coroutine.first;
 import static de.esoco.coroutine.CoroutineScope.launch;
-import static de.esoco.coroutine.Coroutines.STACKTRACE_HANDLER;
+import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.step.CallSubroutine.call;
 import static de.esoco.coroutine.step.ChannelReceive.receive;
 import static de.esoco.coroutine.step.ChannelSend.send;
@@ -72,7 +72,7 @@ public class CoroutineTest
 	public static void setupClass()
 	{
 		// suppress stacktraces from error testing
-		Coroutines.getDefaultContext().set(STACKTRACE_HANDLER, t ->{});
+		Coroutines.getDefaultContext().set(EXCEPTION_HANDLER, t ->{});
 	}
 
 	//~ Methods ----------------------------------------------------------------

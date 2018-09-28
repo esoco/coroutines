@@ -28,12 +28,14 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.obrel.core.RelatedObject;
 import org.obrel.core.RelationType;
 
-import static de.esoco.coroutine.Coroutines.STACKTRACE_HANDLER;
+import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
+import static de.esoco.coroutine.Coroutines.closeManagedResources;
 
 
 /********************************************************************
@@ -158,7 +160,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 			cancel();
 			rScope.fail(this);
 
-			getConfigValue(STACKTRACE_HANDLER).accept(eError);
+			getConfigValue(EXCEPTION_HANDLER).accept(eError);
 		}
 	}
 
@@ -186,7 +188,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 */
 	public <V> V getConfigValue(RelationType<V> rConfigType)
 	{
-		Coroutine<?, ?> rCoroutine = getCoroutine();
+		Coroutine<?, ?> rCoroutine = getCurrentCoroutine();
 		V			    rValue;
 
 		if (hasRelation(rConfigType))
@@ -215,7 +217,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 *
 	 * @return The currently executing coroutine
 	 */
-	public final Coroutine<?, ?> getCoroutine()
+	public final Coroutine<?, ?> getCurrentCoroutine()
 	{
 		return aCoroutineStack.peek();
 	}
@@ -335,19 +337,30 @@ public class Continuation<T> extends RelatedObject implements Executor
 	{
 		assert aCoroutineStack.size() == 1;
 
-		this.rResult = rResult;
-
-		// lock ensures that setting of fRunWhenDone is correctly synchronized
-		aPostProcessingLock.runLocked(() -> bFinished = true);
-
-		aFinishSignal.countDown();
-
-		if (!bCancelled && fRunWhenDone != null)
+		try
 		{
-			CompletableFuture.runAsync(() -> fRunWhenDone.apply(rResult));
-		}
+			this.rResult = rResult;
 
-		rScope.coroutineFinished(this);
+			// lock ensures that setting of fRunWhenDone is correctly synchronized
+			aPostProcessingLock.runLocked(() -> bFinished = true);
+
+			aFinishSignal.countDown();
+
+			if (!bCancelled && fRunWhenDone != null)
+			{
+				CompletableFuture.runAsync(() -> fRunWhenDone.apply(rResult));
+			}
+
+			rScope.coroutineFinished(this);
+		}
+		finally
+		{
+			Consumer<Throwable> fErrorHandler =
+				getConfigValue(EXCEPTION_HANDLER);
+
+			closeManagedResources(getCurrentCoroutine(), fErrorHandler);
+			closeManagedResources(this, fErrorHandler);
+		}
 	}
 
 	/***************************************
@@ -356,6 +369,10 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 */
 	void subroutineFinished()
 	{
+		closeManagedResources(
+			getCurrentCoroutine(),
+			getConfigValue(EXCEPTION_HANDLER));
+
 		aCoroutineStack.pop();
 	}
 
