@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import org.obrel.core.Relatable;
+import org.obrel.core.Relation;
 import org.obrel.core.RelationType;
 import org.obrel.core.RelationTypes;
 import org.obrel.type.MetaTypes;
@@ -82,15 +83,15 @@ public class Coroutines
 	  			r ->
 	  				r.hasAnnotation(MetaTypes.MANAGED) &&
 	  				r.getTarget() != null)
+			  .map(Relation::getTarget)
 			  .forEach(
-	  			r ->
+	  			t ->
 	  		{
-	  			if (r instanceof AutoCloseable)
+	  			if (t instanceof AutoCloseable)
 	  			{
 	  				try
 	  				{
-	  					((AutoCloseable) r).close();
-	  					System.out.printf("Closed %s\n", r);
+	  					((AutoCloseable) t).close();
 	  				}
 	  				catch (Exception e)
 	  				{
