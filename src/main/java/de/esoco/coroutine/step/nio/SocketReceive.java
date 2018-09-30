@@ -40,7 +40,7 @@ public class SocketReceive extends AsynchronousSocketStep
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private final Predicate<ByteBuffer> pFinished;
+	private final Predicate<ByteBuffer> pCheckFinished;
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -49,17 +49,17 @@ public class SocketReceive extends AsynchronousSocketStep
 	 *
 	 * @param fGetSocketAddress A function that provides the target socket
 	 *                          address from the current continuation
-	 * @param pFinished         bUntilEnd TRUE to read data until an
-	 *                          end-of-stream signal (-1) is received or FALSE
-	 *                          to only read data once
+	 * @param pCheckFinished    A predicate that checks whether receiving is
+	 *                          complete by evaluating the byte buffer after
+	 *                          reading
 	 */
 	public SocketReceive(
 		Function<Continuation<?>, SocketAddress> fGetSocketAddress,
-		Predicate<ByteBuffer>					 pFinished)
+		Predicate<ByteBuffer>					 pCheckFinished)
 	{
 		super(fGetSocketAddress);
 
-		this.pFinished = pFinished;
+		this.pCheckFinished = pCheckFinished;
 	}
 
 	//~ Static methods ---------------------------------------------------------
@@ -112,6 +112,27 @@ public class SocketReceive extends AsynchronousSocketStep
 		return receiveFrom(c -> rSocketAddress);
 	}
 
+	/***************************************
+	 * Suspends until data has been received from a previously connected channel
+	 * stored in the currently executed coroutine. If no such channel exists the
+	 * execution will fail. This invocation is intended to be used for
+	 * request-response communication where a receive is always preceded by a
+	 * send operation.
+	 *
+	 * <p>The predicate argument is the same as for the {@link
+	 * #until(Predicate)} method.</p>
+	 *
+	 * @param  pCheckFinished A predicate that checks whether the data has been
+	 *                        received completely
+	 *
+	 * @return A new step instance
+	 */
+	public static SocketReceive receiveUntil(
+		Predicate<ByteBuffer> pCheckFinished)
+	{
+		return receiveFrom((SocketAddress) null).until(pCheckFinished);
+	}
+
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
@@ -121,14 +142,14 @@ public class SocketReceive extends AsynchronousSocketStep
 	 * is reached before the receiving is finished the coroutine will fail with
 	 * an exception.
 	 *
-	 * @param  pFinished A predicate that checks whether the data has been
-	 *                   received completely
+	 * @param  pCheckFinished A predicate that checks whether the data has been
+	 *                        received completely
 	 *
 	 * @return A new step instance
 	 */
-	public SocketReceive until(Predicate<ByteBuffer> pFinished)
+	public SocketReceive until(Predicate<ByteBuffer> pCheckFinished)
 	{
-		return new SocketReceive(getSocketAddressFactory(), pFinished);
+		return new SocketReceive(getSocketAddressFactory(), pCheckFinished);
 	}
 
 	/***************************************
@@ -150,7 +171,7 @@ public class SocketReceive extends AsynchronousSocketStep
 		}
 		else
 		{
-			bFinished = pFinished.test(rData);
+			bFinished = pCheckFinished.test(rData);
 
 			if (!bFinished && rData.hasRemaining())
 			{
@@ -180,7 +201,7 @@ public class SocketReceive extends AsynchronousSocketStep
 		do
 		{
 			nReceived = aChannel.read(rData).get();
-			bFinished = pFinished.test(rData);
+			bFinished = pCheckFinished.test(rData);
 		}
 		while (nReceived != -1 && !bFinished && rData.hasRemaining());
 

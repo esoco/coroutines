@@ -72,10 +72,13 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance.
+	 * Creates a new instance that connects to the socket the address of which
+	 * is provided by the given factory. The factory may return NULL if the step
+	 * is intended to connect to a channel that has been connected by a previous
+	 * coroutine step.
 	 *
-	 * @param fGetSocketAddress A function that provides the target socket
-	 *                          address from the current continuation
+	 * @param fGetSocketAddress A function that provides the socket address to
+	 *                          connect to from the current continuation
 	 */
 	public AsynchronousSocketStep(
 		Function<Continuation<?>, SocketAddress> fGetSocketAddress)

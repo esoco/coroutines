@@ -29,7 +29,7 @@ import static de.esoco.coroutine.Coroutine.first;
 import static de.esoco.coroutine.CoroutineScope.launch;
 import static de.esoco.coroutine.step.CodeExecution.run;
 import static de.esoco.coroutine.step.nio.SocketReceive.contentFullyRead;
-import static de.esoco.coroutine.step.nio.SocketReceive.receiveFrom;
+import static de.esoco.coroutine.step.nio.SocketReceive.receiveUntil;
 import static de.esoco.coroutine.step.nio.SocketSend.sendTo;
 
 import static de.esoco.lib.datatype.Range.from;
@@ -104,8 +104,7 @@ public class CoroutineDemo
 		InetSocketAddress server = new InetSocketAddress("httpbin.org", 80);
 
 		Coroutine<ByteBuffer, ByteBuffer> cr =
-			first(sendTo(server)).then(
-				receiveFrom(server).until(contentFullyRead()));
+			first(sendTo(server)).then(receiveUntil(contentFullyRead()));
 
 		launch(
 			run ->
@@ -118,7 +117,7 @@ public class CoroutineDemo
 
 				data.flip();
 
-				ByteBuffer result = run.blocking(cr, data).getResult();
+				ByteBuffer result = run.async(cr, data).getResult();
 
 				System.out.printf(
 					"RESPONSE: \n%s",
