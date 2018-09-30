@@ -174,6 +174,63 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
+	 * Returns a configuration value with a default value of NULL.
+	 *
+	 * @see #getConfiguration(RelationType, Object)
+	 */
+	public <V> V getConfiguration(RelationType<V> rConfigType)
+	{
+		return getConfiguration(rConfigType, null);
+	}
+
+	/***************************************
+	 * Returns the value of a configuration relation. The lookup has the
+	 * precedence <i>continuation (this) -&gt; scope -&gt; context -&gt;
+	 * coroutine</i>, meaning that a configuration in an earlier stage overrides
+	 * the later ones. This means that a (static) configuration in a coroutine
+	 * definition can be overridden by the runtime stages.
+	 *
+	 * <p>Coroutine steps that want to modify the configuration of the root
+	 * coroutine they are running in should set the configuration value on the
+	 * the continuation. To limit the change to the currently running coroutine
+	 * (e.g. a subroutine) configurations should be set on {@link
+	 * Continuation#getCurrentCoroutine()} instead.</p>
+	 *
+	 * @param  rConfigType The configuraton relation type
+	 * @param  rDefault    The default value if no state relation exists
+	 *
+	 * @return The configuration value (may be NULL)
+	 */
+	public <V> V getConfiguration(RelationType<V> rConfigType, V rDefault)
+	{
+		V rValue = rDefault;
+
+		if (hasRelation(rConfigType))
+		{
+			rValue = get(rConfigType);
+		}
+		else if (rScope.hasRelation(rConfigType))
+		{
+			rValue = rScope.get(rConfigType);
+		}
+		else if (rScope.context().hasRelation(rConfigType))
+		{
+			rValue = rScope.context().get(rConfigType);
+		}
+		else
+		{
+			Coroutine<?, ?> rCoroutine = getCurrentCoroutine();
+
+			if (rCoroutine.hasRelation(rConfigType))
+			{
+				rValue = rCoroutine.get(rConfigType);
+			}
+		}
+
+		return rValue;
+	}
+
+	/***************************************
 	 * Returns either the root coroutine or, if subroutines have been started
 	 * from it, the currently executing subroutine.
 	 *
@@ -225,6 +282,16 @@ public class Continuation<T> extends RelatedObject implements Executor
 		{
 			throw new CoroutineException(e);
 		}
+	}
+
+	/***************************************
+	 * Returns a state value with a default value of NULL.
+	 *
+	 * @see #getState(RelationType, Object)
+	 */
+	public <V> V getState(RelationType<V> rConfigType)
+	{
+		return getState(rConfigType, null);
 	}
 
 	/***************************************
@@ -354,53 +421,6 @@ public class Continuation<T> extends RelatedObject implements Executor
 		});
 
 		return this;
-	}
-
-	/***************************************
-	 * Returns the value of a configuration relation. The lookup has the
-	 * precedence <i>continuation (this) -&gt; scope -&gt; context -&gt;
-	 * coroutine</i>, meaning that a configuration in an earlier stage overrides
-	 * the later ones. This means that a (static) configuration in a coroutine
-	 * definition can be overridden by the runtime stages.
-	 *
-	 * <p>Coroutine steps that want to modify the configuration of the root
-	 * coroutine they are running in should set the configuration value on the
-	 * the continuation. To limit the change to the currently running coroutine
-	 * (e.g. a subroutine) configurations should be set on {@link
-	 * Continuation#getCurrentCoroutine()} instead.</p>
-	 *
-	 * @param  rConfigType The configuraton relation type
-	 * @param  rDefault    The default value if no state relation exists
-	 *
-	 * @return The configuration value (may be NULL)
-	 */
-	protected <V> V getConfiguration(RelationType<V> rConfigType, V rDefault)
-	{
-		V rValue = rDefault;
-
-		if (hasRelation(rConfigType))
-		{
-			rValue = get(rConfigType);
-		}
-		else if (rScope.hasRelation(rConfigType))
-		{
-			rValue = rScope.get(rConfigType);
-		}
-		else if (rScope.context().hasRelation(rConfigType))
-		{
-			rValue = rScope.context().get(rConfigType);
-		}
-		else
-		{
-			Coroutine<?, ?> rCoroutine = getCurrentCoroutine();
-
-			if (rCoroutine.hasRelation(rConfigType))
-			{
-				rValue = rCoroutine.get(rConfigType);
-			}
-		}
-
-		return rValue;
 	}
 
 	/***************************************
