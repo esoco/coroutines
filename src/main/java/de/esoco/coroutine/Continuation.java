@@ -156,8 +156,8 @@ public class Continuation<T> extends RelatedObject implements Executor
 		if (!bFinished)
 		{
 			this.eError = eError;
-			cancel();
 			rScope.fail(this);
+			cancel();
 
 			getConfigValue(EXCEPTION_HANDLER).accept(eError);
 		}
