@@ -17,20 +17,22 @@
 package de.esoco.coroutine.step.nio;
 
 import de.esoco.coroutine.Continuation;
+import de.esoco.coroutine.CoroutineException;
 
-import java.io.EOFException;
+import java.io.IOException;
 
 import java.net.SocketAddress;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.nio.charset.StandardCharsets;
 
-import java.util.concurrent.CompletionException;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 
 /********************************************************************
- * Implements asynchronous writing to a {@link AsynchronousSocketChannel}.
+ * Implements asynchronous reading from a {@link AsynchronousSocketChannel}.
  *
  * @author eso
  */
@@ -38,7 +40,7 @@ public class SocketReceive extends AsynchronousSocketStep
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private boolean bUntilEnd;
+	private final Predicate<ByteBuffer> pFinished;
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -47,60 +49,49 @@ public class SocketReceive extends AsynchronousSocketStep
 	 *
 	 * @param fGetSocketAddress A function that provides the target socket
 	 *                          address from the current continuation
-	 * @param bUntilEnd         TRUE to read data until an end-of-stream signal
-	 *                          (-1) is received or FALSE to only read data once
+	 * @param pFinished         bUntilEnd TRUE to read data until an
+	 *                          end-of-stream signal (-1) is received or FALSE
+	 *                          to only read data once
 	 */
 	public SocketReceive(
 		Function<Continuation<?>, SocketAddress> fGetSocketAddress,
-		boolean									 bUntilEnd)
+		Predicate<ByteBuffer>					 pFinished)
 	{
 		super(fGetSocketAddress);
 
-		this.bUntilEnd = bUntilEnd;
+		this.pFinished = pFinished;
 	}
 
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Suspends until all available data has been received from a network
-	 * socket. The data will be stored in the input {@link ByteBuffer} of the
-	 * step. If the capacity of the buffer is reached before the EOF signal is
-	 * received the coroutine will be terminated with a {@link
-	 * CompletionException}.
+	 * Returns a new predicate to be used with {@link #until(Predicate)} that
+	 * checks whether a byte buffer contains the complete content of an HTTP
+	 * response. The test is performed by calculating the full data size from
+	 * the 'Content-Length' attribute in the response header and comparing it
+	 * with the buffer position.
 	 *
-	 * <p>This variant receives data until an end-of-stream signal (size of -1)
-	 * is received. If no such signal is available from the socket the step
-	 * needs to be created with {@link #receiveFrom(Function)}.</p>
-	 *
-	 * @param  fGetSocketAddress A function that provides the source socket
-	 *                           address from the current continuation
-	 *
-	 * @return A new step instance
+	 * @return A new predicate instance
 	 */
-	public static SocketReceive receiveAllFrom(
-		Function<Continuation<?>, SocketAddress> fGetSocketAddress)
+	public static Predicate<ByteBuffer> contentFullyRead()
 	{
-		return new SocketReceive(fGetSocketAddress, true);
-	}
-
-	/***************************************
-	 * @see #receiveFrom(Function)
-	 */
-	public static SocketReceive receiveAllFrom(SocketAddress rSocketAddress)
-	{
-		return receiveAllFrom(c -> rSocketAddress);
+		return new CheckContentLength();
 	}
 
 	/***************************************
 	 * Suspends until data has been received from a network socket. The data
 	 * will be stored in the input {@link ByteBuffer} of the step. If the
 	 * capacity of the buffer is reached before the EOF signal is received the
-	 * coroutine will be terminated with a {@link CompletionException}.
+	 * coroutine will be terminated with a {@link CoroutineException}.
 	 *
-	 * <p>This variant only receives the next block of data that is sent by the
-	 * remote socket and then continues execution. If data should be read until
-	 * an end-of-stream signal is received the step needs to be created with
-	 * {@link #receiveAllFrom(Function)}.</p>
+	 * <p>After the data has been fully received {@link ByteBuffer#flip()} will
+	 * be invoked on the buffer so that it can be used directly for subsequent
+	 * reading from it.</p>
+	 *
+	 * <p>The returned step only receives the next block of data that is sent by
+	 * the remote socket and then continues the coroutine execution. If data
+	 * should be read until a certain condition is met a derived step needs to
+	 * be created with {@link #until(Predicate)}.</p>
 	 *
 	 * @param  fGetSocketAddress A function that provides the source socket
 	 *                           address from the current continuation
@@ -110,7 +101,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	public static SocketReceive receiveFrom(
 		Function<Continuation<?>, SocketAddress> fGetSocketAddress)
 	{
-		return new SocketReceive(fGetSocketAddress, false);
+		return new SocketReceive(fGetSocketAddress, bb -> true);
 	}
 
 	/***************************************
@@ -124,6 +115,23 @@ public class SocketReceive extends AsynchronousSocketStep
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
+	 * Returns a new receive step instance the suspends until data has been
+	 * received from a network socket and a certain condition on that data is
+	 * met or an end-of-stream signal is received. If the capacity of the buffer
+	 * is reached before the receiving is finished the coroutine will fail with
+	 * an exception.
+	 *
+	 * @param  pFinished A predicate that checks whether the data has been
+	 *                   received completely
+	 *
+	 * @return A new step instance
+	 */
+	public SocketReceive until(Predicate<ByteBuffer> pFinished)
+	{
+		return new SocketReceive(getSocketAddressFactory(), pFinished);
+	}
+
+	/***************************************
 	 * {@inheritDoc}
 	 */
 	@Override
@@ -132,18 +140,30 @@ public class SocketReceive extends AsynchronousSocketStep
 		AsynchronousSocketChannel							rChannel,
 		ByteBuffer											rData,
 		ChannelCallback<Integer, AsynchronousSocketChannel> rCallback)
+		throws IOException
 	{
-		if ((nReceived == FIRST_OPERATION || (bUntilEnd && nReceived > 0)) &&
-			rData.hasRemaining())
+		boolean bFinished = false;
+
+		if (nReceived == FIRST_OPERATION)
 		{
 			rChannel.read(rData, rData, rCallback);
-
-			return false;
 		}
 		else
 		{
-			return true;
+			bFinished = pFinished.test(rData);
+
+			if (!bFinished && rData.hasRemaining())
+			{
+				rChannel.read(rData, rData, rCallback);
+			}
+			else
+			{
+				checkErrors(rData, nReceived, bFinished);
+				rData.flip();
+			}
 		}
+
+		return bFinished;
 	}
 
 	/***************************************
@@ -154,17 +174,102 @@ public class SocketReceive extends AsynchronousSocketStep
 		AsynchronousSocketChannel aChannel,
 		ByteBuffer				  rData) throws Exception
 	{
-		int nReceived;
+		int     nReceived;
+		boolean bFinished;
 
 		do
 		{
 			nReceived = aChannel.read(rData).get();
+			bFinished = pFinished.test(rData);
 		}
-		while (bUntilEnd && nReceived != -1 && rData.hasRemaining());
+		while (nReceived != -1 && !bFinished && rData.hasRemaining());
 
-		if (bUntilEnd && nReceived != -1)
+		checkErrors(rData, nReceived, bFinished);
+
+		rData.flip();
+	}
+
+	/***************************************
+	 * Checks the received data and throws an exception on errors.
+	 *
+	 * @param  rData     The received data bytes
+	 * @param  nReceived The number of bytes received on the last read
+	 * @param  bFinished TRUE if the finish condition is met
+	 *
+	 * @throws IOException If an error is detected
+	 */
+	private void checkErrors(ByteBuffer rData, int nReceived, boolean bFinished)
+		throws IOException
+	{
+		if (!bFinished)
 		{
-			throw new EOFException("Buffer size to small");
+			if (nReceived == -1)
+			{
+				throw new IOException("Received data incomplete");
+			}
+			else if (!rData.hasRemaining())
+			{
+				throw new IOException("Buffer capacity exceeded");
+			}
+		}
+	}
+
+	//~ Inner Classes ----------------------------------------------------------
+
+	/********************************************************************
+	 * A predicate to check the Content-Length property in an HTTP header.
+	 *
+	 * @author eso
+	 */
+	static class CheckContentLength implements Predicate<ByteBuffer>
+	{
+		//~ Static fields/initializers -----------------------------------------
+
+		private static final String CONTENT_LENGTH_HEADER = "Content-Length: ";
+
+		//~ Instance fields ----------------------------------------------------
+
+		private int nFullLength = -1;
+
+		//~ Methods ------------------------------------------------------------
+
+		/***************************************
+		 * {@inheritDoc}
+		 */
+		@Override
+		public boolean test(ByteBuffer rBuffer)
+		{
+			if (nFullLength == -1)
+			{
+				String sData =
+					StandardCharsets.UTF_8.decode(
+						(ByteBuffer) rBuffer.duplicate().flip()).toString();
+
+				int nLengthPos = sData.indexOf(CONTENT_LENGTH_HEADER);
+
+				nFullLength = sData.indexOf("\r\n\r\n");
+
+				if (nFullLength == -1)
+				{
+					throw new IllegalArgumentException("No HTTP header found");
+				}
+
+				if (nLengthPos == -1)
+				{
+					throw new IllegalArgumentException(
+						"No content length found");
+				}
+
+				int nContentLength =
+					Integer.parseInt(
+						sData.substring(
+							nLengthPos + CONTENT_LENGTH_HEADER.length(),
+							sData.indexOf("\r\n", nLengthPos)));
+
+				nFullLength += nContentLength + 4; // 4 = CRLFCRLF
+			}
+
+			return rBuffer.position() >= nFullLength;
 		}
 	}
 }

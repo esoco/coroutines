@@ -16,17 +16,14 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine.step.nio;
 
+import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspension;
-
-import java.io.IOException;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousChannel;
 import java.nio.channels.CompletionHandler;
-
-import java.util.concurrent.CompletionException;
 
 
 /********************************************************************
@@ -52,8 +49,8 @@ public abstract class AsynchronousChannelStep
 {
 	//~ Static fields/initializers ---------------------------------------------
 
-	/** Signal for the operation it is the first access. */
-	protected static final int FIRST_OPERATION = -2;
+	/** Internal signal for the first operation after a connect. */
+	static final int FIRST_OPERATION = -2;
 
 	//~ Inner Interfaces -------------------------------------------------------
 
@@ -80,11 +77,14 @@ public abstract class AsynchronousChannelStep
 		 *
 		 * @return FALSE if a recursive asynchronous execution has been started,
 		 *         TRUE if the operation is complete
+		 *
+		 * @throws Exception Any kind of exception may be thrown
 		 */
 		public boolean execute(int						   nBytesProcessed,
 							   C						   rChannel,
 							   ByteBuffer				   rData,
-							   ChannelCallback<Integer, C> rCallback);
+							   ChannelCallback<Integer, C> rCallback)
+			throws Exception;
 	}
 
 	//~ Inner Classes ----------------------------------------------------------
@@ -137,16 +137,33 @@ public abstract class AsynchronousChannelStep
 				rResult instanceof Integer ? ((Integer) rResult).intValue()
 										   : FIRST_OPERATION;
 
-			// required to force THIS to integer to have only one implementation
-			// as the Java NIO API declares the connect stage callback as Void
-			if (fOperation.execute(
-					nProcessed,
-					rChannel,
-					rData,
-					(ChannelCallback<Integer, C>) this))
+			try
 			{
-				rSuspension.resume(rData);
+				// required to force THIS to integer to have only one implementation
+				// as the Java NIO API declares the connect stage callback as Void
+				if (fOperation.execute(
+						nProcessed,
+						rChannel,
+						rData,
+						(ChannelCallback<Integer, C>) this))
+				{
+					rSuspension.resume(rData);
+				}
 			}
+			catch (Exception e)
+			{
+				rSuspension.continuation().fail(e);
+			}
+		}
+
+		/***************************************
+		 * Returns the continuation of this callback.
+		 *
+		 * @return The continuation
+		 */
+		public Continuation<?> continuation()
+		{
+			return rSuspension.continuation();
 		}
 
 		/***************************************
@@ -156,15 +173,6 @@ public abstract class AsynchronousChannelStep
 		public void failed(Throwable eError, ByteBuffer rData)
 		{
 			rSuspension.continuation().fail(eError);
-
-			try
-			{
-				rChannel.close();
-			}
-			catch (IOException e)
-			{
-				throw new CompletionException(e);
-			}
 		}
 	}
 }

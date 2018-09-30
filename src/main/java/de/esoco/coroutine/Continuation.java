@@ -24,7 +24,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
@@ -249,7 +248,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 			{
 				if (eError != null)
 				{
-					throw new CompletionException(eError);
+					throw new CoroutineException(eError);
 				}
 				else
 				{
@@ -261,7 +260,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 		}
 		catch (InterruptedException e)
 		{
-			throw new CompletionException(e);
+			throw new CoroutineException(e);
 		}
 	}
 

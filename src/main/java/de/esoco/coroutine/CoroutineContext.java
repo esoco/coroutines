@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +20,6 @@ import de.esoco.lib.concurrent.RunLock;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -110,7 +109,7 @@ public class CoroutineContext extends RelatedObject
 			}
 			catch (InterruptedException e)
 			{
-				throw new CompletionException(e);
+				throw new CoroutineException(e);
 			}
 		}
 	}

@@ -19,7 +19,6 @@ package de.esoco.coroutine;
 import de.esoco.lib.collection.CollectionUtil;
 
 import java.util.Collection;
-import java.util.concurrent.CompletionException;
 
 
 /********************************************************************
@@ -28,7 +27,7 @@ import java.util.concurrent.CompletionException;
  *
  * @author eso
  */
-public class CoroutineScopeException extends CompletionException
+public class CoroutineScopeException extends CoroutineException
 {
 	//~ Static fields/initializers ---------------------------------------------
 

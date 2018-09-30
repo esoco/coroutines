@@ -56,10 +56,10 @@ public class SocketSend extends AsynchronousSocketStep
 	 * to a network socket.The buffer must be initialized for sending, i.e. if
 	 * necessary a call to {@link Buffer#flip()} must have been performed.
 	 *
-	 * <p>After the data has been fully sent {@link Buffer#clear()} will be
-	 * invoked on the buffer so that it can be used directly in any subsequent
-	 * receiving step. This supports the implementation of typical
-	 * request-response sequences.</p>
+	 * <p>After the data has been fully sent {@link ByteBuffer#clear()} will be
+	 * invoked on the buffer so that it can be used directly for subsequent
+	 * writing to it. An example would be a following {@link SocketReceive} to
+	 * implement a request-response scheme.</p>
 	 *
 	 * @param  fGetSocketAddress A function that provides the target socket
 	 *                           address from the current continuation

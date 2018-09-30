@@ -80,7 +80,8 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 	 * the next step if the suspension ends.</p>
 	 *
 	 * <p>Subclasses that override this method also need to handle errors by
-	 * forwarding any exceptions to {@link Continuation#fail(Throwable)}.</p>
+	 * terminating any further execution and forwarding the causing exception to
+	 * {@link Continuation#fail(Throwable)}.</p>
 	 *
 	 * @param fPreviousExecution The future of the previous code execution
 	 * @param rNextStep          The next step to execute or NULL for none

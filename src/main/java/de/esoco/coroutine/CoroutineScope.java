@@ -20,7 +20,6 @@ import de.esoco.lib.concurrent.RunLock;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -174,7 +173,7 @@ public class CoroutineScope extends RelatedObject
 		}
 		catch (InterruptedException e)
 		{
-			throw new CompletionException(e);
+			throw new CoroutineException(e);
 		}
 	}
 

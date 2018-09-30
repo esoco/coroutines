@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +21,6 @@ import de.esoco.lib.concurrent.RunLock;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.LinkedBlockingQueue;
 
 
@@ -80,20 +79,20 @@ public class Channel<T>
 	{
 		return aAccessLock.supplyLocked(
 			() ->
+		{
+			try
 			{
-				try
-				{
-					T rValue = aChannelData.take();
+				T rValue = aChannelData.take();
 
-					resumeSenders();
+				resumeSenders();
 
-					return rValue;
-				}
-				catch (InterruptedException e)
-				{
-					throw new CompletionException(e);
-				}
-			});
+				return rValue;
+			}
+			catch (InterruptedException e)
+			{
+				throw new CoroutineException(e);
+			}
+		});
 	}
 
 	/***************************************
@@ -148,17 +147,17 @@ public class Channel<T>
 	{
 		aAccessLock.runLocked(
 			() ->
+		{
+			try
 			{
-				try
-				{
-					aChannelData.put(rValue);
-					resumeReceivers();
-				}
-				catch (InterruptedException e)
-				{
-					throw new CompletionException(e);
-				}
-			});
+				aChannelData.put(rValue);
+				resumeReceivers();
+			}
+			catch (InterruptedException e)
+			{
+				throw new CoroutineException(e);
+			}
+		});
 	}
 
 	/***************************************
@@ -174,17 +173,17 @@ public class Channel<T>
 	{
 		aAccessLock.runLocked(
 			() ->
+		{
+			if (aChannelData.offer(rSuspension.input()))
 			{
-				if (aChannelData.offer(rSuspension.input()))
-				{
-					rSuspension.resume();
-					resumeReceivers();
-				}
-				else
-				{
-					aSendQueue.add(rSuspension);
-				}
-			});
+				rSuspension.resume();
+				resumeReceivers();
+			}
+			else
+			{
+				aSendQueue.add(rSuspension);
+			}
+		});
 	}
 
 	/***************************************

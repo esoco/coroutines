@@ -23,12 +23,12 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 
 import static de.esoco.coroutine.Coroutine.first;
 import static de.esoco.coroutine.CoroutineScope.launch;
 import static de.esoco.coroutine.step.CodeExecution.run;
+import static de.esoco.coroutine.step.nio.SocketReceive.contentFullyRead;
 import static de.esoco.coroutine.step.nio.SocketReceive.receiveFrom;
 import static de.esoco.coroutine.step.nio.SocketSend.sendTo;
 
@@ -78,7 +78,7 @@ public class CoroutineDemo
 		}
 		catch (InterruptedException e)
 		{
-			throw new CompletionException(e);
+			throw new CoroutineException(e);
 		}
 
 		p.measure(nThreadCount + " Threads");
@@ -101,10 +101,11 @@ public class CoroutineDemo
 	 */
 	public static void demoSocketCommunication()
 	{
-		InetSocketAddress server = new InetSocketAddress("example.com", 80);
+		InetSocketAddress server = new InetSocketAddress("httpbin.org", 80);
 
 		Coroutine<ByteBuffer, ByteBuffer> cr =
-			first(sendTo(server)).then(receiveFrom(server));
+			first(sendTo(server)).then(
+				receiveFrom(server).until(contentFullyRead()));
 
 		launch(
 			run ->
@@ -112,22 +113,16 @@ public class CoroutineDemo
 				ByteBuffer data = ByteBuffer.allocate(100_000);
 
 				data.put(
-					"GET /index.html HTTP/1.1\r\nHost: example.com\r\n\r\n"
-						.getBytes(StandardCharsets.US_ASCII));
+					"GET /get HTTP/1.1\r\nHost: httpbin.org\r\n\r\n".getBytes(
+						StandardCharsets.US_ASCII));
 
 				data.flip();
 
 				ByteBuffer result = run.blocking(cr, data).getResult();
 
-				result.flip();
-
-				byte[] bytes = new byte[result.limit()];
-
-				result.get(bytes);
-
 				System.out.printf(
 					"RESPONSE: \n%s",
-					new String(bytes, StandardCharsets.UTF_8));
+					StandardCharsets.UTF_8.decode(result).toString());
 			});
 	}
 

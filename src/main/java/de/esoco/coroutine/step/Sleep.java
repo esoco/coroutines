@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,12 +18,12 @@ package de.esoco.coroutine.step;
 
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
+import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspension;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 
 
@@ -102,7 +102,7 @@ public class Sleep<T> extends CoroutineStep<T, T>
 		}
 		catch (InterruptedException e)
 		{
-			throw new CompletionException(e);
+			throw new CoroutineException(e);
 		}
 
 		return rInput;

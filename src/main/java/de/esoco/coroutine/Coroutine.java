@@ -436,8 +436,8 @@ public class Coroutine<I, O> extends RelatedObject
 		//~ Constructors -------------------------------------------------------
 
 		/***************************************
-		 * Creates a new instance that invokes the code another coroutine as a
-		 * subroutine and then returns the control flow to a step in the
+		 * Creates a new instance that invokes the code of another coroutine as
+		 * a subroutine and then returns the control flow to a step in the
 		 * invoking subroutine. The code of the original coroutine will be
 		 * copied into this instance, not referenced directly.
 		 *
