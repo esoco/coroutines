@@ -157,7 +157,7 @@ public class Loop<T> extends CoroutineStep<T, T>
 		}
 		else
 		{
-			rNextStep.suspend(rContinuation).resume(rInput);
+			rContinuation.suspend(rNextStep).resume(rInput);
 		}
 	}
 }

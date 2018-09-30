@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -80,7 +80,7 @@ public class ChannelReceive<I, O> extends CoroutineStep<I, O>
 	{
 		fPreviousExecution.thenAcceptAsync(
 			v -> rContinuation.getChannel(rChannelId)
-				.receiveSuspending(rNextStep.suspend(rContinuation)),
+				.receiveSuspending(rContinuation.suspend(rNextStep)),
 			rContinuation);
 	}
 

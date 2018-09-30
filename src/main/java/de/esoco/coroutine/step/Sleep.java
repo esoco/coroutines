@@ -116,7 +116,7 @@ public class Sleep<T> extends CoroutineStep<T, T>
 						 CoroutineStep<T, ?>  rNextStep,
 						 Continuation<?>	  rContinuation)
 	{
-		Suspension<T> rSuspension = rNextStep.suspend(rContinuation);
+		Suspension<T> rSuspension = rContinuation.suspend(rNextStep);
 
 		fPreviousExecution.thenAcceptAsync(
 			i ->

@@ -99,7 +99,7 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 						 Continuation<?>			   rContinuation)
 	{
 		fPreviousExecution.thenAcceptAsync(
-			b -> connectAsync(b, rNextStep.suspend(rContinuation)),
+			b -> connectAsync(b, rContinuation.suspend(rNextStep)),
 			rContinuation);
 	}
 

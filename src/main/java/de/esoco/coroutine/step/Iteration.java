@@ -204,7 +204,7 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 		}
 		else
 		{
-			rNextStep.suspend(rContinuation).resume(rResults);
+			rContinuation.suspend(rNextStep).resume(rResults);
 		}
 	}
 }

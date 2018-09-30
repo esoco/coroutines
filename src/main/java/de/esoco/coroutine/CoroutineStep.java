@@ -125,39 +125,6 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 	}
 
 	/***************************************
-	 * Suspends this step for later invocation and returns an instance of {@link
-	 * Suspension} that contains the state necessary for resuming the execution.
-	 * Other than {@link #suspend(Object, Continuation)} this suspension will
-	 * not contain an explicit input value. Such suspensions are used if the
-	 * input will only become available when the suspension ends (e.g. when
-	 * receiving data asynchronously).
-	 *
-	 * @param  rContinuation The continuation of the suspended execution
-	 *
-	 * @return A new suspension object
-	 */
-	public Suspension<I> suspend(Continuation<?> rContinuation)
-	{
-		return suspend(null, rContinuation);
-	}
-
-	/***************************************
-	 * Suspends this step for later invocation and returns an instance of {@link
-	 * Suspension} that contains the state necessary for resuming the execution.
-	 * If the input value is not known before the suspension ends the method
-	 * {@link #suspend(Continuation)} can be used instead.
-	 *
-	 * @param  rInput        The input value for the execution
-	 * @param  rContinuation The continuation of the suspended execution
-	 *
-	 * @return A new suspension object
-	 */
-	public Suspension<I> suspend(I rInput, Continuation<?> rContinuation)
-	{
-		return new Suspension<>(rInput, this, rContinuation);
-	}
-
-	/***************************************
 	 * {@inheritDoc}
 	 */
 	@Override

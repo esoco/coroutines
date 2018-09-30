@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -79,7 +79,7 @@ public class ChannelSend<T> extends CoroutineStep<T, T>
 	{
 		fPreviousExecution.thenAcceptAsync(
 			v -> rContinuation.getChannel(rChannelId)
-				.sendSuspending(rNextStep.suspend(v, rContinuation)),
+				.sendSuspending(rContinuation.suspend(rNextStep)),
 			rContinuation);
 	}
 
