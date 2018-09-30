@@ -22,24 +22,24 @@ import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspension;
 
+import de.esoco.lib.datatype.Pair;
+
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.obrel.type.StandardTypes;
+
+import static org.obrel.type.StandardTypes.DURATION;
+
 
 /********************************************************************
- * A suspending {@link Coroutine} step that pauses execution for an amount of
- * time.
+ * A suspending {@link Coroutine} step that performes delayed executions.
  *
  * @author eso
  */
-public class TimerStep<T> extends CoroutineStep<T, T>
+public class Delay<T> extends CoroutineStep<T, T>
 {
-	//~ Instance fields --------------------------------------------------------
-
-	private int		 nDuration;
-	private TimeUnit eTimeUnit;
-
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
@@ -48,17 +48,16 @@ public class TimerStep<T> extends CoroutineStep<T, T>
 	 * @param nDuration The duration to pause
 	 * @param eUnit     The time unit of the duration
 	 */
-	public TimerStep(int nDuration, TimeUnit eUnit)
+	public Delay(long nDuration, TimeUnit eUnit)
 	{
 		if (nDuration < 0)
 		{
-			throw new IllegalArgumentException("Durations must be >= 0");
+			throw new IllegalArgumentException("Duration must be >= 0");
 		}
 
 		Objects.requireNonNull(eUnit);
 
-		this.nDuration = nDuration;
-		this.eTimeUnit = eUnit;
+		set(DURATION, Pair.of(nDuration, eUnit));
 	}
 
 	//~ Static methods ---------------------------------------------------------
@@ -66,26 +65,28 @@ public class TimerStep<T> extends CoroutineStep<T, T>
 	/***************************************
 	 * Suspends the coroutine execution for a certain time in milliseconds.
 	 *
-	 * @param  nMilliseconds The milliseconds to sleep
+	 * @param nMilliseconds The milliseconds to sleep
 	 *
-	 * @return A new step instance
+	 * @see   #sleep(int, TimeUnit)
 	 */
-	public static <T> TimerStep<T> sleep(int nMilliseconds)
+	public static <T> Delay<T> sleep(int nMilliseconds)
 	{
 		return sleep(nMilliseconds, TimeUnit.MILLISECONDS);
 	}
 
 	/***************************************
-	 * Suspends the coroutine execution for a certain time.
+	 * Suspends the coroutine execution for a certain time. The configured
+	 * duration can be overridden in the current continuation by setting the
+	 * state relation {@link StandardTypes#DURATION}.
 	 *
 	 * @param  nDuration The duration to sleep
 	 * @param  eUnit     The time unit of the duration
 	 *
 	 * @return A new step instance
 	 */
-	public static <T> TimerStep<T> sleep(int nDuration, TimeUnit eUnit)
+	public static <T> Delay<T> sleep(int nDuration, TimeUnit eUnit)
 	{
-		return new TimerStep<>(nDuration, eUnit);
+		return new Delay<>(nDuration, eUnit);
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -98,7 +99,9 @@ public class TimerStep<T> extends CoroutineStep<T, T>
 	{
 		try
 		{
-			eTimeUnit.sleep(nDuration);
+			Pair<Long, TimeUnit> rDuration = getDuration(rContinuation);
+
+			rDuration.second().sleep(rDuration.first());
 		}
 		catch (InterruptedException e)
 		{
@@ -120,11 +123,32 @@ public class TimerStep<T> extends CoroutineStep<T, T>
 
 		fPreviousExecution.thenAcceptAsync(
 			i ->
-		{
-			rContinuation.context()
-			.getScheduler()
-			.schedule(() -> rSuspension.resume(i), nDuration, eTimeUnit);
-		},
-		rContinuation);
+			{
+				Pair<Long, TimeUnit> rDuration = getDuration(rContinuation);
+
+				rContinuation.context()
+				.getScheduler()
+				.schedule(
+					() -> rSuspension.resume(i),
+					rDuration.first(),
+					rDuration.second());
+			},
+			rContinuation);
+	}
+
+	/***************************************
+	 * Returns the duration from either the current continuation or, if not set,
+	 * from this step.
+	 *
+	 * @param  rContinuation The continuation
+	 *
+	 * @return The duration
+	 */
+	private Pair<Long, TimeUnit> getDuration(Continuation<?> rContinuation)
+	{
+		Pair<Long, TimeUnit> rDuration =
+			rContinuation.getState(DURATION, get(DURATION));
+
+		return rDuration;
 	}
 }
