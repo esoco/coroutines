@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @author eso
  */
-public class Sleep<T> extends CoroutineStep<T, T>
+public class TimerStep<T> extends CoroutineStep<T, T>
 {
 	//~ Instance fields --------------------------------------------------------
 
@@ -48,7 +48,7 @@ public class Sleep<T> extends CoroutineStep<T, T>
 	 * @param nDuration The duration to pause
 	 * @param eUnit     The time unit of the duration
 	 */
-	public Sleep(int nDuration, TimeUnit eUnit)
+	public TimerStep(int nDuration, TimeUnit eUnit)
 	{
 		if (nDuration < 0)
 		{
@@ -70,7 +70,7 @@ public class Sleep<T> extends CoroutineStep<T, T>
 	 *
 	 * @return A new step instance
 	 */
-	public static <T> Sleep<T> sleep(int nMilliseconds)
+	public static <T> TimerStep<T> sleep(int nMilliseconds)
 	{
 		return sleep(nMilliseconds, TimeUnit.MILLISECONDS);
 	}
@@ -83,9 +83,9 @@ public class Sleep<T> extends CoroutineStep<T, T>
 	 *
 	 * @return A new step instance
 	 */
-	public static <T> Sleep<T> sleep(int nDuration, TimeUnit eUnit)
+	public static <T> TimerStep<T> sleep(int nDuration, TimeUnit eUnit)
 	{
-		return new Sleep<>(nDuration, eUnit);
+		return new TimerStep<>(nDuration, eUnit);
 	}
 
 	//~ Methods ----------------------------------------------------------------
