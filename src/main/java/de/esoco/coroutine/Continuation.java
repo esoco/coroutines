@@ -159,7 +159,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 			rScope.fail(this);
 			cancel();
 
-			getConfigValue(EXCEPTION_HANDLER).accept(eError);
+			getConfiguration(EXCEPTION_HANDLER).accept(eError);
 		}
 	}
 
@@ -175,20 +175,24 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 	/***************************************
 	 * Returns the value of a configuration relation. The lookup has the
-	 * precedence <i>continuation (this) -&gt; scope -&gt; coroutine -&gt;
-	 * context</i>, meaning that a configuration in an earlier stage overrides
-	 * the later ones. Coroutine steps that want to modify the configuration of
-	 * the coroutine they are running in should therefore set the configuration
-	 * value on the the continuation.
+	 * precedence <i>continuation (this) -&gt; scope -&gt; context -&gt;
+	 * coroutine</i>, meaning that a configuration in an earlier stage overrides
+	 * the later ones. This means that a (static) configuration in a coroutine
+	 * definition can be overridden by the runtime stages.
+	 *
+	 * <p>Coroutine steps that want to modify the configuration of the root
+	 * coroutine they are running in should set the configuration value on the
+	 * the continuation. To limit the change to the currently running coroutine
+	 * (e.g. a subroutine) configurations should be set on {@link
+	 * Continuation#getCurrentCoroutine()} instead.</p>
 	 *
 	 * @param  rConfigType The configuraton relation type
 	 *
-	 * @return The configuration value
+	 * @return The configuration value (may be NULL)
 	 */
-	public <V> V getConfigValue(RelationType<V> rConfigType)
+	public <V> V getConfiguration(RelationType<V> rConfigType)
 	{
-		Coroutine<?, ?> rCoroutine = getCurrentCoroutine();
-		V			    rValue;
+		V rValue = null;
 
 		if (hasRelation(rConfigType))
 		{
@@ -198,13 +202,18 @@ public class Continuation<T> extends RelatedObject implements Executor
 		{
 			rValue = rScope.get(rConfigType);
 		}
-		else if (rCoroutine.hasRelation(rConfigType))
+		else if (rScope.context().hasRelation(rConfigType))
 		{
-			rValue = rCoroutine.get(rConfigType);
+			rValue = rScope.context().get(rConfigType);
 		}
 		else
 		{
-			rValue = rScope.context().get(rConfigType);
+			Coroutine<?, ?> rCoroutine = getCurrentCoroutine();
+
+			if (rCoroutine.hasRelation(rConfigType))
+			{
+				rValue = rCoroutine.get(rConfigType);
+			}
 		}
 
 		return rValue;
@@ -265,6 +274,39 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
+	 * Returns the value of a runtime state relation of the current execution.
+	 * This will first look for the value in currently executing coroutine
+	 * (either the root or a subroutine). If not found there the value will be
+	 * queried from this continuation first and if not there too, from the
+	 * scope. To the a runtime state value the respective relation needs to be
+	 * set on the appropriate stage (coroutine, continuation, scope).
+	 *
+	 * @param  rConfigType The state relation type
+	 *
+	 * @return The runtime state value (may be null)
+	 */
+	public <V> V getState(RelationType<V> rConfigType)
+	{
+		Coroutine<?, ?> rCoroutine = getCurrentCoroutine();
+		V			    rValue     = null;
+
+		if (rCoroutine.hasRelation(rConfigType))
+		{
+			rValue = rCoroutine.get(rConfigType);
+		}
+		else if (hasRelation(rConfigType))
+		{
+			rValue = get(rConfigType);
+		}
+		else if (rScope.hasRelation(rConfigType))
+		{
+			rValue = rScope.get(rConfigType);
+		}
+
+		return rValue;
+	}
+
+	/***************************************
 	 * {@inheritDoc}
 	 */
 	public boolean isCancelled()
@@ -312,6 +354,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 * Suspension} that contains the state necessary for resuming the execution.
 	 * If the input value is not known before the suspension ends the method
 	 * {@link #suspend(Continuation)} can be used instead.
+	 *
 	 * @param  rStep  The step to suspend
 	 * @param  rInput The input value for the execution
 	 *
@@ -387,7 +430,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 		finally
 		{
 			Consumer<Throwable> fErrorHandler =
-				getConfigValue(EXCEPTION_HANDLER);
+				getConfiguration(EXCEPTION_HANDLER);
 
 			closeManagedResources(getCurrentCoroutine(), fErrorHandler);
 			closeManagedResources(this, fErrorHandler);
@@ -402,7 +445,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	{
 		closeManagedResources(
 			getCurrentCoroutine(),
-			getConfigValue(EXCEPTION_HANDLER));
+			getConfiguration(EXCEPTION_HANDLER));
 
 		aCoroutineStack.pop();
 	}
