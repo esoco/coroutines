@@ -44,7 +44,7 @@ import static org.obrel.type.StandardTypes.NAME;
  * such a case it is typically also necessary to override the method {@link
  * #runAsync(CompletableFuture, CoroutineStep, Continuation)} to check for the
  * suspension condition. If a suspension is necessary a {@link Suspension}
- * object can be created by invoking a {@link #suspend(Object, Continuation)}
+ * object can be created by invoking a {@link #suspend(Continuation, Object)}
  * method. The object can then be used by code that waits for some external
  * condition to resume the coroutine when appropriate.</p>
  *

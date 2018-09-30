@@ -79,7 +79,7 @@ public class ChannelSend<T> extends CoroutineStep<T, T>
 	{
 		fPreviousExecution.thenAcceptAsync(
 			v -> rContinuation.getChannel(rChannelId)
-				.sendSuspending(rContinuation.suspend(rNextStep)),
+				.sendSuspending(rContinuation.suspend(rNextStep, v)),
 			rContinuation);
 	}
 

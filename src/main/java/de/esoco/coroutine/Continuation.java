@@ -293,7 +293,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	/***************************************
 	 * Suspends a step for later invocation and returns an instance of {@link
 	 * Suspension} that contains the state necessary for resuming the execution.
-	 * Other than {@link #suspend(Object, Continuation)} this suspension will
+	 * Other than {@link #suspend(Continuation, Object)} this suspension will
 	 * not contain an explicit input value. Such suspensions are used if the
 	 * input will only become available when the suspension ends (e.g. when
 	 * receiving data asynchronously).
@@ -304,7 +304,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 */
 	public <I> Suspension<I> suspend(CoroutineStep<I, ?> rStep)
 	{
-		return suspend(null, rStep);
+		return suspend(rStep, null);
 	}
 
 	/***************************************
@@ -312,13 +312,12 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 * Suspension} that contains the state necessary for resuming the execution.
 	 * If the input value is not known before the suspension ends the method
 	 * {@link #suspend(Continuation)} can be used instead.
-	 *
-	 * @param  rInput The input value for the execution
 	 * @param  rStep  The step to suspend
+	 * @param  rInput The input value for the execution
 	 *
 	 * @return A new suspension object
 	 */
-	public <I> Suspension<I> suspend(I rInput, CoroutineStep<I, ?> rStep)
+	public <I> Suspension<I> suspend(CoroutineStep<I, ?> rStep, I rInput)
 	{
 		return new Suspension<>(rInput, rStep, this);
 	}
