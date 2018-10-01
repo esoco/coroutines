@@ -29,13 +29,16 @@ import java.util.concurrent.LinkedBlockingQueue;
  *
  * @author eso
  */
-public class Channel<T>
+public class Channel<T> implements AutoCloseable
 {
 	//~ Instance fields --------------------------------------------------------
 
 	private final ChannelId<T> rId;
 
-	private final BlockingQueue<T>     aChannelData;
+	private final BlockingQueue<T> aChannelData;
+
+	private boolean bClosed = false;
+
 	private final Deque<Suspension<T>> aSendQueue    = new LinkedList<>();
 	private final Deque<Suspension<T>> aReceiveQueue = new LinkedList<>();
 
@@ -60,6 +63,47 @@ public class Channel<T>
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
+	 * Throws a {@link ChannelClosedException} if this channel is already
+	 * closed.
+	 */
+	public final void checkClosed()
+	{
+		if (isClosed())
+		{
+			throw new ChannelClosedException(rId);
+		}
+	}
+
+	/***************************************
+	 * Closes this channel. All send and receive operations on a closed channel
+	 * will throw a {@link ChannelClosedException}. If there are remaining
+	 * suspensions in this channel they will also be failed with such an
+	 * exception.
+	 */
+	@Override
+	public void close()
+	{
+		aAccessLock.runLocked(
+			() ->
+			{
+				bClosed = true;
+
+				ChannelClosedException eClosed =
+					new ChannelClosedException(rId);
+
+				for (Suspension<T> rSuspension : aReceiveQueue)
+				{
+					rSuspension.fail(eClosed);
+				}
+
+				for (Suspension<T> rSuspension : aSendQueue)
+				{
+					rSuspension.fail(eClosed);
+				}
+			});
+	}
+
+	/***************************************
 	 * Returns the channel identifier.
 	 *
 	 * @return The channel ID
@@ -67,6 +111,16 @@ public class Channel<T>
 	public ChannelId<T> getId()
 	{
 		return rId;
+	}
+
+	/***************************************
+	 * Returns the closed.
+	 *
+	 * @return The closed
+	 */
+	public final boolean isClosed()
+	{
+		return bClosed;
 	}
 
 	/***************************************
@@ -79,20 +133,22 @@ public class Channel<T>
 	{
 		return aAccessLock.supplyLocked(
 			() ->
-		{
-			try
 			{
-				T rValue = aChannelData.take();
+				checkClosed();
 
-				resumeSenders();
+				try
+				{
+					T rValue = aChannelData.take();
 
-				return rValue;
-			}
-			catch (InterruptedException e)
-			{
-				throw new CoroutineException(e);
-			}
-		});
+					resumeSenders();
+
+					return rValue;
+				}
+				catch (InterruptedException e)
+				{
+					throw new CoroutineException(e);
+				}
+			});
 	}
 
 	/***************************************
@@ -110,6 +166,8 @@ public class Channel<T>
 		aAccessLock.runLocked(
 			() ->
 			{
+				checkClosed();
+
 				T rValue = aChannelData.poll();
 
 				if (rValue != null)
@@ -147,17 +205,19 @@ public class Channel<T>
 	{
 		aAccessLock.runLocked(
 			() ->
-		{
-			try
 			{
-				aChannelData.put(rValue);
-				resumeReceivers();
-			}
-			catch (InterruptedException e)
-			{
-				throw new CoroutineException(e);
-			}
-		});
+				checkClosed();
+
+				try
+				{
+					aChannelData.put(rValue);
+					resumeReceivers();
+				}
+				catch (InterruptedException e)
+				{
+					throw new CoroutineException(e);
+				}
+			});
 	}
 
 	/***************************************
@@ -173,17 +233,19 @@ public class Channel<T>
 	{
 		aAccessLock.runLocked(
 			() ->
-		{
-			if (aChannelData.offer(rSuspension.input()))
 			{
-				rSuspension.resume();
-				resumeReceivers();
-			}
-			else
-			{
-				aSendQueue.add(rSuspension);
-			}
-		});
+				checkClosed();
+
+				if (aChannelData.offer(rSuspension.input()))
+				{
+					rSuspension.resume();
+					resumeReceivers();
+				}
+				else
+				{
+					aSendQueue.add(rSuspension);
+				}
+			});
 	}
 
 	/***************************************

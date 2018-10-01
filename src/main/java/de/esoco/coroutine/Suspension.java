@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -62,8 +62,9 @@ public class Suspension<T>
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
-	 * Cancels this suspension by canceling the continuation. Resuming a
-	 * cancelled suspension will be ignored.
+	 * Cancels this suspension. This will {@link Continuation#cancel() cancel}
+	 * the continuation. Tries to resuming a cancelled suspension will be
+	 * ignored.
 	 */
 	public void cancel()
 	{
@@ -78,6 +79,18 @@ public class Suspension<T>
 	public final Continuation<?> continuation()
 	{
 		return rContinuation;
+	}
+
+	/***************************************
+	 * Cancels this suspension because of an error. This will {@link
+	 * Continuation#fail(Throwable) fail} the continuation. Tries to resume a
+	 * failed suspension will be ignored.
+	 *
+	 * @param e The error exception
+	 */
+	public void fail(Throwable e)
+	{
+		rContinuation.fail(e);
 	}
 
 	/***************************************

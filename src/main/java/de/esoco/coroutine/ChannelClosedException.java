@@ -16,52 +16,44 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
-import java.util.concurrent.CompletionException;
-
-
 /********************************************************************
- * The base class of unchecked exceptions that may be thrown by {@link
- * Coroutine} executions.
+ * A coroutine exception that is thrown if a closed channel is accessed.
  *
  * @author eso
  */
-public class CoroutineException extends CompletionException
+public class ChannelClosedException extends CoroutineException
 {
 	//~ Static fields/initializers ---------------------------------------------
 
 	private static final long serialVersionUID = 1L;
+
+	//~ Instance fields --------------------------------------------------------
+
+	private final ChannelId<?> rChannelId;
 
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
 	 * Creates a new instance.
 	 *
-	 * @param eCause The causing exception
+	 * @param rId The channel ID
 	 */
-	public CoroutineException(Throwable eCause)
+	public ChannelClosedException(ChannelId<?> rId)
 	{
-		super(eCause);
+		super("Channel %s is closed", rId);
+
+		rChannelId = rId;
 	}
 
-	/***************************************
-	 * Creates a new instance with a formatted message.
-	 *
-	 * @param sMessageFormat The error message format string
-	 * @param rArgs          The format arguments
-	 */
-	public CoroutineException(String sMessageFormat, Object... rArgs)
-	{
-		super(String.format(sMessageFormat, rArgs));
-	}
+	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance.
+	 * Returns the channel id.
 	 *
-	 * @param sMessage The error message
-	 * @param eCause   The causing exception
+	 * @return The channel id
 	 */
-	public CoroutineException(String sMessage, Throwable eCause)
+	public ChannelId<?> getChannelId()
 	{
-		super(sMessage, eCause);
+		return rChannelId;
 	}
 }
