@@ -16,14 +16,13 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
+import de.esoco.lib.collection.CollectionUtil;
 import de.esoco.lib.concurrent.RunLock;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
-
-import org.obrel.core.RelatedObject;
 
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.Coroutines.closeManagedResources;
@@ -38,7 +37,7 @@ import static de.esoco.coroutine.Coroutines.closeManagedResources;
  *
  * @author eso
  */
-public class CoroutineScope extends RelatedObject
+public class CoroutineScope extends CoroutineEnvironment
 {
 	//~ Instance fields --------------------------------------------------------
 
@@ -125,9 +124,39 @@ public class CoroutineScope extends RelatedObject
 			closeManagedResources(aScope, aScope.get(EXCEPTION_HANDLER));
 		}
 
-		if (aScope.aFailedContinuations.size() > 0)
+		handleErrors(aScope.aFailedContinuations);
+	}
+
+	/***************************************
+	 * Handles errors that occurred during the coroutine executions in a scope.
+	 *
+	 * @param rFailedContinuations A collection of failed continuations (can be
+	 *                             empty)
+	 */
+	private static void handleErrors(
+		Collection<Continuation<?>> rFailedContinuations)
+	{
+		if (rFailedContinuations.size() > 0)
 		{
-			throw new CoroutineScopeException(aScope.aFailedContinuations);
+			if (rFailedContinuations.size() == 1)
+			{
+				Throwable eError =
+					CollectionUtil.firstElementOf(rFailedContinuations)
+								  .getError();
+
+				if (eError instanceof CoroutineException)
+				{
+					throw (CoroutineException) eError;
+				}
+				else
+				{
+					throw new CoroutineScopeException(rFailedContinuations);
+				}
+			}
+			else
+			{
+				throw new CoroutineScopeException(rFailedContinuations);
+			}
 		}
 	}
 
@@ -236,6 +265,27 @@ public class CoroutineScope extends RelatedObject
 	}
 
 	/***************************************
+	 * Checks this scope and the {@link CoroutineContext} for a channel with the
+	 * given ID. If no such channel exists it will be created in this scope. If
+	 * a context channel is needed instead it needs to be created in advance
+	 * with {@link CoroutineContext#createChannel(ChannelId, int)}.
+	 *
+	 * @see CoroutineEnvironment#getChannel(ChannelId)
+	 */
+	@Override
+	public <T> Channel<T> getChannel(ChannelId<T> rId)
+	{
+		if (rContext.hasChannel(rId))
+		{
+			return rContext.getChannel(rId);
+		}
+		else
+		{
+			return super.getChannel(rId);
+		}
+	}
+
+	/***************************************
 	 * Returns the number of currently running coroutines. This will only be a
 	 * momentary value as the execution of the coroutines happens asynchronously
 	 * and coroutines may finish while querying this count.
@@ -245,6 +295,18 @@ public class CoroutineScope extends RelatedObject
 	public long getCoroutineCount()
 	{
 		return nRunningCoroutines.get();
+	}
+
+	/***************************************
+	 * Checks whether a channel with the given ID exists in this scope or in the
+	 * {@link CoroutineContext}.
+	 *
+	 * @see CoroutineEnvironment#hasChannel(ChannelId)
+	 */
+	@Override
+	public boolean hasChannel(ChannelId<?> rId)
+	{
+		return super.hasChannel(rId) || rContext.hasChannel(rId);
 	}
 
 	/***************************************
@@ -267,6 +329,25 @@ public class CoroutineScope extends RelatedObject
 	public boolean isCancelOnError()
 	{
 		return bCancelOnError;
+	}
+
+	/***************************************
+	 * Removes a channel from this scope or from the {@link CoroutineContext}.
+	 * If it exists in both it will only be removed from this scope.
+	 *
+	 * @see CoroutineEnvironment#removeChannel(ChannelId)
+	 */
+	@Override
+	public void removeChannel(ChannelId<?> rId)
+	{
+		if (hasChannel(rId))
+		{
+			super.removeChannel(rId);
+		}
+		else
+		{
+			rContext.removeChannel(rId);
+		}
 	}
 
 	/***************************************
@@ -304,6 +385,17 @@ public class CoroutineScope extends RelatedObject
 				aSuspensions.add(rSuspension);
 			}
 		});
+	}
+
+	/***************************************
+	 * Removes a continuation from the list of failed continuations to prevent
+	 * an error exception upon completion.
+	 *
+	 * @param rContinuation The continuation to remove
+	 */
+	void continuationErrorHandled(Continuation<?> rContinuation)
+	{
+		aFailedContinuations.remove(rContinuation);
 	}
 
 	/***************************************

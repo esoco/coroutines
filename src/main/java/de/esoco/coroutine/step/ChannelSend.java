@@ -18,53 +18,79 @@ package de.esoco.coroutine.step;
 
 import de.esoco.coroutine.ChannelId;
 import de.esoco.coroutine.Continuation;
+import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
 
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+
+import org.obrel.core.RelationType;
 
 
 /********************************************************************
  * A coroutine step that sends a value into a channel. If the channel capacity
  * has been reached at the time of this step's invocation the coroutine
- * execution will be suspended until channel capacity becomes available.
+ * execution will be suspended until channel capacity becomes available. The
+ * channel to send to will be queried (and if not existing created) by calling
+ * {@link CoroutineScope#getChannel(ChannelId)}.
  *
  * <p>A send step returns the input value it sends so that it ca be processed
  * further in subsequent steps if needed.</p>
  *
  * @author eso
  */
-public class ChannelSend<T> extends CoroutineStep<T, T>
+public class ChannelSend<T> extends ChannelStep<T, T>
 {
-	//~ Instance fields --------------------------------------------------------
-
-	private ChannelId<T> rChannelId;
-
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance.
+	 * Creates a new instance that sends to a certain channel.
 	 *
-	 * @param rId The ID of the channel to send to
+	 * @param rId The ID of the channel
 	 */
 	public ChannelSend(ChannelId<T> rId)
 	{
-		Objects.requireNonNull(rId);
-		this.rChannelId = rId;
+		super(rId);
+	}
+
+	/***************************************
+	 * Creates a new instance that sends to a channel the ID of which is
+	 * provided in a state relation.
+	 *
+	 * @param rChannelType rThe type of the state relation the target channel ID
+	 *                     is stored in
+	 */
+	public ChannelSend(RelationType<ChannelId<T>> rChannelType)
+	{
+		super(rChannelType);
 	}
 
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Suspends until a value can be sent to a channel.
+	 * Suspends until a value can be sent to a certain channel.
 	 *
 	 * @param  rId The ID of the channel to send to
 	 *
-	 * @return A new instance of this class
+	 * @return A new step instance
 	 */
 	public static <T> ChannelSend<T> send(ChannelId<T> rId)
 	{
 		return new ChannelSend<>(rId);
+	}
+
+	/***************************************
+	 * Suspends until a value can be sent to the channel with the ID stored in
+	 * the relation with the given type.
+	 *
+	 * @param  rChannelType rThe type of the state relation the target channel
+	 *                      ID is stored in
+	 *
+	 * @return A new step instance
+	 */
+	public static <T> ChannelSend<T> send(
+		RelationType<ChannelId<T>> rChannelType)
+	{
+		return new ChannelSend<>(rChannelType);
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -78,9 +104,12 @@ public class ChannelSend<T> extends CoroutineStep<T, T>
 						 Continuation<?>	  rContinuation)
 	{
 		fPreviousExecution.thenAcceptAsync(
-			v -> rContinuation.getChannel(rChannelId)
-				.sendSuspending(rContinuation.suspend(rNextStep, v)),
-			rContinuation);
+				  			v ->
+				  				getChannel(rContinuation).sendSuspending(
+				  					rContinuation.suspend(rNextStep, v)),
+				  			rContinuation)
+						  .exceptionally(t ->
+				  				rContinuation.fail(t));
 	}
 
 	/***************************************
@@ -89,7 +118,7 @@ public class ChannelSend<T> extends CoroutineStep<T, T>
 	@Override
 	protected T execute(T rInput, Continuation<?> rContinuation)
 	{
-		rContinuation.getChannel(rChannelId).sendBlocking(rInput);
+		getChannel(rContinuation).sendBlocking(rInput);
 
 		return rInput;
 	}

@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,9 +23,10 @@ import java.util.Objects;
  * This is a marker interface for identifiers of {@link Channel channels} which
  * are used for communication between {@link Coroutine coroutines}. One possible
  * usage would be to implement it on enums or similar constants that are to be
- * used as channel IDs. IDs are generically typed with the datatype of the
- * target channel. Implementations are responsible to that their channel IDs are
- * unique also with respect to the datatype.
+ * used as channel IDs. To simplify typed lookup of channels IDs are generically
+ * typed with the datatype of the target channel. Either implementations or
+ * application are responsible that their channel IDs are unique also with
+ * respect to the datatype.
  *
  * <p>Instances of a default implementation of string-based IDs can be created
  * through the generic factory method {@link #channel(String, Class)}. Please
@@ -44,7 +45,7 @@ public interface ChannelId<T>
 	 *
 	 * @param  sId The ID string
 	 *
-	 * @return The new ID
+	 * @return The new boolean ID
 	 *
 	 * @see    #channel(String, Class)
 	 */
@@ -55,24 +56,26 @@ public interface ChannelId<T>
 
 	/***************************************
 	 * Creates a new channel ID from an identifier string. Channel IDs with the
-	 * same string are considered equal and will therefore give access to the
-	 * same channel in a {@link CoroutineContext}. String IDs won't be cached so
-	 * that invocations with the the same string will return different instances
-	 * although these are considered equal. To avoid name clashes in complex
-	 * scenarios the ID names should be selected appropriately, e.g. by using
-	 * namespaces. The implementation doesn't impose any restrictions on the
-	 * strings used to define IDs.
+	 * same identifier string are considered equal and will therefore give
+	 * access to the same channel in a {@link CoroutineContext}. IDs aren't
+	 * cached so that invocations with the the same string and datatyoe will
+	 * return different instances which are considered equal (see below). To
+	 * avoid name clashes in complex scenarios the ID names should be selected
+	 * appropriately, e.g. by using namespaces. The implementation doesn't
+	 * impose any restrictions on the strings used to define IDs.
 	 *
 	 * <p>Equality of string-based IDs is also based on the datatype. That means
 	 * that it is possible to create equal-named channel IDs for different
 	 * datatypes. Accessing channels through such IDs would yield different
-	 * channel instances. It lies in the responsibility of the application to
-	 * name channel IDs appropriately for the respective context.</p>
+	 * channel instances but that usage is not recommended. It lies in the
+	 * responsibility of the application to name channel IDs appropriately for
+	 * the respective context (or provide it's own {@link ChannelId}
+	 * implementations).</p>
 	 *
 	 * @param  sId       The channel ID string
 	 * @param  rDatatype The class of the channel datatype to ensure
 	 *
-	 * @return A new {@link StringId}
+	 * @return A new channel ID
 	 */
 	public static <T> ChannelId<T> channel(String sId, Class<T> rDatatype)
 	{
@@ -87,7 +90,7 @@ public interface ChannelId<T>
 	 *
 	 * @param  sId The ID string
 	 *
-	 * @return The new ID
+	 * @return The new integer ID
 	 *
 	 * @see    #channel(String, Class)
 	 */
@@ -101,7 +104,7 @@ public interface ChannelId<T>
 	 *
 	 * @param  sId The ID string
 	 *
-	 * @return The new ID
+	 * @return The new string ID
 	 *
 	 * @see    #channel(String, Class)
 	 */
@@ -176,8 +179,7 @@ public interface ChannelId<T>
 		@Override
 		public String toString()
 		{
-			return ChannelId.class.getSimpleName() +
-				   String.format("[%s-%s]", sId, rDatatype.getSimpleName());
+			return String.format("%s<%s>", sId, rDatatype.getSimpleName());
 		}
 	}
 }

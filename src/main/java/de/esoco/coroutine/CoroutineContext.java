@@ -18,8 +18,6 @@ package de.esoco.coroutine;
 
 import de.esoco.lib.concurrent.RunLock;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -27,23 +25,18 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.obrel.core.RelatedObject;
-
 
 /********************************************************************
  * The context for the execution of {@link Coroutine Coroutines}.
  *
  * @author eso
  */
-public class CoroutineContext extends RelatedObject
+public class CoroutineContext extends CoroutineEnvironment
 {
 	//~ Instance fields --------------------------------------------------------
 
 	private final Executor			 rExecutor;
 	private ScheduledExecutorService rScheduler;
-
-	private final Map<ChannelId<?>, Channel<?>> aChannels    = new HashMap<>();
-	private final RunLock					    aChannelLock = new RunLock();
 
 	private final AtomicLong nRunningScopes		   = new AtomicLong();
 	private final RunLock    aScopeLock			   = new RunLock();
@@ -115,66 +108,6 @@ public class CoroutineContext extends RelatedObject
 	}
 
 	/***************************************
-	 * Creates a new channel with a certain capacity and stores it in this
-	 * context for lookup with {@link #getChannel(ChannelId)}. If a channel with
-	 * the given ID already exists an exception will be thrown to prevent
-	 * accidental overwriting of channels.
-	 *
-	 * @param  rId       The channel ID
-	 * @param  nCapacity The channel capacity
-	 *
-	 * @return The new channel
-	 *
-	 * @throws IllegalArgumentException If a channel with the given ID already
-	 *                                  exists
-	 */
-	public <T> Channel<T> createChannel(ChannelId<T> rId, int nCapacity)
-	{
-		return aChannelLock.supplyLocked(
-			() ->
-			{
-				if (aChannels.containsKey(rId))
-				{
-					throw new IllegalArgumentException(
-						String.format("Channel %s already exists", rId));
-				}
-
-				Channel<T> aChannel = new Channel<>(rId, nCapacity);
-
-				aChannels.put(rId, aChannel);
-
-				return aChannel;
-			});
-	}
-
-	/***************************************
-	 * Returns a channel for a certain ID. If no such channel exists a new
-	 * channel with a capacity of 1 (one) entry will be created and stored under
-	 * the given ID. To prevent this the channel needs to be created in advance
-	 * by calling {@link #createChannel(ChannelId, int)}.
-	 *
-	 * @param  rId The channel ID
-	 *
-	 * @return The channel for the given ID
-	 */
-	@SuppressWarnings("unchecked")
-	public <T> Channel<T> getChannel(ChannelId<T> rId)
-	{
-		return aChannelLock.supplyLocked(
-			() ->
-			{
-				Channel<T> rChannel = (Channel<T>) aChannels.get(rId);
-
-				if (rChannel == null)
-				{
-					rChannel = createChannel(rId, 1);
-				}
-
-				return rChannel;
-			});
-	}
-
-	/***************************************
 	 * Returns the executor to be used for the execution of the steps of a
 	 * {@link Coroutine}.
 	 *
@@ -214,35 +147,6 @@ public class CoroutineContext extends RelatedObject
 	public long getScopeCount()
 	{
 		return nRunningScopes.get();
-	}
-
-	/***************************************
-	 * Checks whether this context contains a certain channel. As with the other
-	 * channel access methods the result depends on the current execution state
-	 * of the coroutines in this context. It is recommended to only invoke this
-	 * method if concurrent modification of the queries channel will not occur.
-	 *
-	 * @param  rId The channel ID
-	 *
-	 * @return TRUE if the channel exists in this context
-	 */
-	public boolean hasChannel(ChannelId<?> rId)
-	{
-		return aChannelLock.supplyLocked(() -> aChannels.containsKey(rId));
-	}
-
-	/***************************************
-	 * Removes a channel from this context. This method should be applied with
-	 * caution because concurrently running coroutines may try to access or
-	 * event re-create the channel in parallel. It is recommended to invoke this
-	 * method only on contexts without running coroutines that access the
-	 * channel ID. Otherwise synchronization is necessary.
-	 *
-	 * @param rId The channel ID
-	 */
-	public void removeChannel(ChannelId<?> rId)
-	{
-		aChannelLock.runLocked(() -> aChannels.remove(rId));
 	}
 
 	/***************************************

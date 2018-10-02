@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.obrel.core.RelationType;
 import org.obrel.type.StandardTypes;
 
 import static org.obrel.type.StandardTypes.DURATION;
@@ -45,10 +46,13 @@ public class Delay<T> extends CoroutineStep<T, T>
 	/***************************************
 	 * Creates a new instance.
 	 *
-	 * @param nDuration The duration to pause
-	 * @param eUnit     The time unit of the duration
+	 * @param rDurationType The relation type to store the delay duration in
+	 * @param nDuration     The duration to pause
+	 * @param eUnit         The time unit of the duration
 	 */
-	public Delay(long nDuration, TimeUnit eUnit)
+	public Delay(RelationType<Pair<Long, TimeUnit>> rDurationType,
+				 long								nDuration,
+				 TimeUnit							eUnit)
 	{
 		if (nDuration < 0)
 		{
@@ -57,13 +61,16 @@ public class Delay<T> extends CoroutineStep<T, T>
 
 		Objects.requireNonNull(eUnit);
 
-		set(DURATION, Pair.of(nDuration, eUnit));
+		if (eUnit != null)
+		{
+			set(DURATION, Pair.of(nDuration, eUnit));
+		}
 	}
 
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Suspends the coroutine execution for a certain time in milliseconds.
+	 * Suspends the coroutine execution for a certain duration in milliseconds.
 	 *
 	 * @param nMilliseconds The milliseconds to sleep
 	 *
@@ -75,7 +82,22 @@ public class Delay<T> extends CoroutineStep<T, T>
 	}
 
 	/***************************************
-	 * Suspends the coroutine execution for a certain time. The configured
+	 * Suspends the coroutine execution for a duration stored in a certain state
+	 * relation. The lookup of the duration value follows the rules defined by
+	 * {@link Continuation#getState(RelationType, Object)}.
+	 *
+	 * @param  rDurationType The relation type of the sleep duration
+	 *
+	 * @return A new step instance
+	 */
+	public static <T> Delay<T> sleep(
+		RelationType<Pair<Long, TimeUnit>> rDurationType)
+	{
+		return new Delay<>(rDurationType, 0, null);
+	}
+
+	/***************************************
+	 * Suspends the coroutine execution for a certain duration. The configured
 	 * duration can be overridden in the current continuation by setting the
 	 * state relation {@link StandardTypes#DURATION}.
 	 *
@@ -86,7 +108,7 @@ public class Delay<T> extends CoroutineStep<T, T>
 	 */
 	public static <T> Delay<T> sleep(int nDuration, TimeUnit eUnit)
 	{
-		return new Delay<>(nDuration, eUnit);
+		return new Delay<>(DURATION, nDuration, eUnit);
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -122,18 +144,22 @@ public class Delay<T> extends CoroutineStep<T, T>
 		Suspension<T> rSuspension = rContinuation.suspend(rNextStep);
 
 		fPreviousExecution.thenAcceptAsync(
-			i ->
-			{
-				Pair<Long, TimeUnit> rDuration = getDuration(rContinuation);
+				  			i ->
+				  			{
+				  				Pair<Long, TimeUnit> rDuration =
+				  					getDuration(rContinuation);
 
-				rContinuation.context()
-				.getScheduler()
-				.schedule(
-					() -> rSuspension.resume(i),
-					rDuration.first(),
-					rDuration.second());
-			},
-			rContinuation);
+				  				rContinuation.context()
+				  				.getScheduler()
+				  				.schedule(
+				  					() ->
+				  						rSuspension.resume(i),
+				  					rDuration.first(),
+				  					rDuration.second());
+				  			},
+				  			rContinuation)
+						  .exceptionally(t ->
+				  				rContinuation.fail(t));
 	}
 
 	/***************************************

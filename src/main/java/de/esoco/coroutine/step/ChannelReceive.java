@@ -18,16 +18,20 @@ package de.esoco.coroutine.step;
 
 import de.esoco.coroutine.ChannelId;
 import de.esoco.coroutine.Continuation;
+import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
 
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+
+import org.obrel.core.RelationType;
 
 
 /********************************************************************
  * A coroutine step that receives a value from a channel. If the channel is
  * empty at the time of this step's invocation the coroutine execution will be
- * suspended until channel data becomes available.
+ * suspended until channel data becomes available. The channel to receive from
+ * will be queried (and if not existing created) with {@link
+ * CoroutineScope#getChannel(ChannelId)}.
  *
  * <p>A receive step can be chained to arbitrary other execution steps that
  * produce a value of the generic type I but that input value will be
@@ -35,37 +39,59 @@ import java.util.concurrent.CompletableFuture;
  *
  * @author eso
  */
-public class ChannelReceive<I, O> extends CoroutineStep<I, O>
+public class ChannelReceive<T> extends ChannelStep<Void, T>
 {
-	//~ Instance fields --------------------------------------------------------
-
-	private ChannelId<O> rChannelId;
-
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance.
+	 * Creates a new instance that receives from a certain channel.
 	 *
-	 * @param rId The ID of the channel to send to
+	 * @param rId The ID of the channel
 	 */
-	public ChannelReceive(ChannelId<O> rId)
+	public ChannelReceive(ChannelId<T> rId)
 	{
-		Objects.requireNonNull(rId);
-		this.rChannelId = rId;
+		super(rId);
+	}
+
+	/***************************************
+	 * Creates a new instance that receives from a channel the ID of which is
+	 * provided in a state relation.
+	 *
+	 * @param rChannelType rThe type of state relation the source channel ID is
+	 *                     stored in
+	 */
+	public ChannelReceive(RelationType<ChannelId<T>> rChannelType)
+	{
+		super(rChannelType);
 	}
 
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Suspends until a value can be received from a channel.
+	 * Suspends until a value can be received from a certain channel.
 	 *
 	 * @param  rId The ID of the channel to receive from
 	 *
 	 * @return A new instance of this class
 	 */
-	public static <I, O> ChannelReceive<I, O> receive(ChannelId<O> rId)
+	public static <T> ChannelReceive<T> receive(ChannelId<T> rId)
 	{
 		return new ChannelReceive<>(rId);
+	}
+
+	/***************************************
+	 * Suspends until a value can be received from the channel with the ID
+	 * stored in the relation with the given type.
+	 *
+	 * @param  rChannelType rThe type of the state relation the source channel
+	 *                      ID is stored in
+	 *
+	 * @return A new step instance
+	 */
+	public static <T> ChannelReceive<T> receive(
+		RelationType<ChannelId<T>> rChannelType)
+	{
+		return new ChannelReceive<>(rChannelType);
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -74,22 +100,25 @@ public class ChannelReceive<I, O> extends CoroutineStep<I, O>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<I> fPreviousExecution,
-						 CoroutineStep<O, ?>  rNextStep,
-						 Continuation<?>	  rContinuation)
+	public void runAsync(CompletableFuture<Void> fPreviousExecution,
+						 CoroutineStep<T, ?>	 rNextStep,
+						 Continuation<?>		 rContinuation)
 	{
 		fPreviousExecution.thenAcceptAsync(
-			v -> rContinuation.getChannel(rChannelId)
-				.receiveSuspending(rContinuation.suspend(rNextStep)),
-			rContinuation);
+				  			v ->
+				  				getChannel(rContinuation).receiveSuspending(
+				  					rContinuation.suspend(rNextStep)),
+				  			rContinuation)
+						  .exceptionally(t ->
+				  				rContinuation.fail(t));
 	}
 
 	/***************************************
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected O execute(I rIgnored, Continuation<?> rContinuation)
+	protected T execute(Void rIgnored, Continuation<?> rContinuation)
 	{
-		return rContinuation.getChannel(rChannelId).receiveBlocking();
+		return getChannel(rContinuation).receiveBlocking();
 	}
 }

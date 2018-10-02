@@ -16,7 +16,7 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
-import java.util.concurrent.CompletableFuture;
+import de.esoco.lib.concurrent.RunLock;
 
 
 /********************************************************************
@@ -32,6 +32,9 @@ public class Suspension<T>
 	private final T					  rInput;
 	private final CoroutineStep<T, ?> rStep;
 	private final Continuation<?>     rContinuation;
+
+	private boolean		  bCancelled  = false;
+	private final RunLock aCancelLock = new RunLock();
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -55,8 +58,6 @@ public class Suspension<T>
 		this.rInput		   = rInput;
 		this.rStep		   = rStep;
 		this.rContinuation = rContinuation;
-
-		rContinuation.scope().addSuspension(this);
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -68,7 +69,12 @@ public class Suspension<T>
 	 */
 	public void cancel()
 	{
-		rContinuation.cancel();
+		aCancelLock.runLocked(() -> bCancelled = true);
+
+		if (!rContinuation.isCancelled())
+		{
+			rContinuation.cancel();
+		}
 	}
 
 	/***************************************
@@ -94,6 +100,25 @@ public class Suspension<T>
 	}
 
 	/***************************************
+	 * Executes code only if this suspension has not (yet) been cancel. The
+	 * given code will be executed with a lock on the cancelation state to
+	 * prevent race conditions if other threads try to cancel a suspension while
+	 * it is resumed.
+	 *
+	 * @param fCode The code to execute only if this suspension is not cancelled
+	 */
+	public void ifNotCancelled(Runnable fCode)
+	{
+		aCancelLock.runLocked(() ->
+		{
+			if (!bCancelled)
+			{
+				fCode.run();
+			}
+		});
+	}
+
+	/***************************************
 	 * Returns the input value.
 	 *
 	 * @return The input
@@ -101,6 +126,16 @@ public class Suspension<T>
 	public final T input()
 	{
 		return rInput;
+	}
+
+	/***************************************
+	 * Checks if the this suspension has been cancelled.
+	 *
+	 * @return TRUE if the suspension has been cancelled
+	 */
+	public boolean isCancelled()
+	{
+		return bCancelled;
 	}
 
 	/***************************************
@@ -115,26 +150,14 @@ public class Suspension<T>
 	}
 
 	/***************************************
-	 * Asynchronously resumes the execution of the suspended coroutine with an
-	 * explicit input value unless the coroutine has been cancelled by a call to
-	 * {@link #cancel()}.
+	 * Resumes the execution of the suspended coroutine with the given input
+	 * value.
 	 *
 	 * @param rStepInput The input value to the step
 	 */
 	public void resume(T rStepInput)
 	{
-		if (!rContinuation.isCancelled())
-		{
-			CompletableFuture<T> fResume =
-				CompletableFuture.supplyAsync(() -> rStepInput, rContinuation);
-
-			// the resume step is always either a StepChain which contains it's own
-			// next step or the final step in a coroutine and therefore rNextStep
-			// can be NULL
-			rStep.runAsync(fResume, null, rContinuation);
-		}
-
-		rContinuation.scope().removeSuspension(this);
+		rContinuation.resumeSuspension(this, rStepInput);
 	}
 
 	/***************************************

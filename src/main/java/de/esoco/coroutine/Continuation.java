@@ -61,17 +61,17 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 	private final CoroutineScope rScope;
 
-	private T		  rResult    = null;
-	private boolean   bCancelled = false;
-	private boolean   bFinished  = false;
-	private Throwable eError     = null;
-
-	private Deque<Coroutine<?, ?>> aCoroutineStack = new ArrayDeque<>();
+	private T			  rResult			 = null;
+	private boolean		  bCancelled		 = false;
+	private boolean		  bFinished			 = false;
+	private Throwable     eError			 = null;
+	private Suspension<?> rCurrentSuspension = null;
 
 	private Function<T, ?> fRunWhenDone;
 
-	private final CountDownLatch aFinishSignal		 = new CountDownLatch(1);
-	private final RunLock		 aPostProcessingLock = new RunLock();
+	private Deque<Coroutine<?, ?>> aCoroutineStack = new ArrayDeque<>();
+	private final CountDownLatch   aFinishSignal   = new CountDownLatch(1);
+	private final RunLock		   aStateLock	   = new RunLock();
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -114,10 +114,19 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 */
 	public void cancel()
 	{
-		if (!bFinished)
+		aStateLock.runLocked(
+			() ->
 		{
-			bCancelled = true;
-			finish(null);
+			if (!bFinished)
+			{
+				bCancelled = true;
+				finish(null);
+			}
+		});
+
+		if (rCurrentSuspension != null)
+		{
+			rCurrentSuspension.cancel();
 		}
 	}
 
@@ -129,6 +138,23 @@ public class Continuation<T> extends RelatedObject implements Executor
 	public final CoroutineContext context()
 	{
 		return rScope.context();
+	}
+
+	/***************************************
+	 * Marks an error of this continuation as handled. This will remove this
+	 * instance from the failed continuations of the scope and thus prevent the
+	 * scope from throwing an exception because of this error upon completion.
+	 *
+	 * @throws IllegalStateException If this instance has no error
+	 */
+	public void errorHandled()
+	{
+		if (eError == null)
+		{
+			throw new IllegalStateException("No error exists");
+		}
+
+		rScope.continuationErrorHandled(this);
 	}
 
 	/***************************************
@@ -149,9 +175,13 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 * CoroutineScope#fail(Continuation)} on the scope this continuation runs
 	 * in.
 	 *
-	 * @param eError The exception that caused the error
+	 * @param  eError The exception that caused the error
+	 *
+	 * @return Declared as Void so that it can be used in calls to {@link
+	 *         CompletableFuture#exceptionally(Function)} without the need to
+	 *         return a (NULL) value
 	 */
-	public void fail(Throwable eError)
+	public Void fail(Throwable eError)
 	{
 		if (!bFinished)
 		{
@@ -161,16 +191,18 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 			getConfiguration(EXCEPTION_HANDLER, null).accept(eError);
 		}
+
+		return null;
 	}
 
 	/***************************************
 	 * Duplicated here for easier access during coroutine execution.
 	 *
-	 * @see CoroutineContext#getChannel(ChannelId)
+	 * @see CoroutineScope#getChannel(ChannelId)
 	 */
 	public final <C> Channel<C> getChannel(ChannelId<C> rId)
 	{
-		return context().getChannel(rId);
+		return rScope.getChannel(rId);
 	}
 
 	/***************************************
@@ -221,7 +253,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 		{
 			Coroutine<?, ?> rCoroutine = getCurrentCoroutine();
 
-			if (rCoroutine.hasRelation(rConfigType))
+			// if rDefault is NULL always query the relation to also get
+			// default and initial values
+			if (rDefault == null || rCoroutine.hasRelation(rConfigType))
 			{
 				rValue = rCoroutine.get(rConfigType);
 			}
@@ -268,7 +302,14 @@ public class Continuation<T> extends RelatedObject implements Executor
 			{
 				if (eError != null)
 				{
-					throw new CoroutineException(eError);
+					if (eError instanceof CoroutineException)
+					{
+						throw (CoroutineException) eError;
+					}
+					else
+					{
+						throw new CoroutineException(eError);
+					}
 				}
 				else
 				{
@@ -329,15 +370,24 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
-	 * {@inheritDoc}
+	 * Checks if the execution of the coroutine has been cancelled. If it has
+	 * been cancelled because of and error the method {@link #getError()} will
+	 * return an exception.
+	 *
+	 * @return TRUE if the execution has been cancelled
 	 */
 	public boolean isCancelled()
 	{
-		return bCancelled || rScope.isCancelled();
+		return bCancelled;
 	}
 
 	/***************************************
-	 * {@inheritDoc}
+	 * Checks if the execution of the coroutine has finished. Whether it has
+	 * finished successfully or by cancelation can be checked with {@link
+	 * #isCancelled()}. If it has been cancelled because of and error the method
+	 * {@link #getError()} will return an exception.
+	 *
+	 * @return TRUE if the execution has finished
 	 */
 	public boolean isFinished()
 	{
@@ -384,7 +434,15 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 */
 	public <I> Suspension<I> suspend(CoroutineStep<I, ?> rStep, I rInput)
 	{
-		return new Suspension<>(rInput, rStep, this);
+		// only one suspension per continuation is possible
+		assert rCurrentSuspension == null;
+
+		Suspension<I> aSuspension = new Suspension<>(rInput, rStep, this);
+
+		rScope.addSuspension(aSuspension);
+		rCurrentSuspension = aSuspension;
+
+		return aSuspension;
 	}
 
 	/***************************************
@@ -403,7 +461,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	public Continuation<T> then(Function<T, ?> fRunWhenDone)
 	{
 		// lock ensures that fRunWhenDone is not set while finishing is in progress
-		aPostProcessingLock.runLocked(
+		aStateLock.runLocked(
 			() ->
 		{
 			if (bFinished)
@@ -438,7 +496,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 			this.rResult = rResult;
 
 			// lock ensures that setting of fRunWhenDone is correctly synchronized
-			aPostProcessingLock.runLocked(() -> bFinished = true);
+			aStateLock.runLocked(() -> bFinished = true);
 
 			aFinishSignal.countDown();
 
@@ -457,6 +515,30 @@ public class Continuation<T> extends RelatedObject implements Executor
 			closeManagedResources(getCurrentCoroutine(), fErrorHandler);
 			closeManagedResources(this, fErrorHandler);
 		}
+	}
+
+	/***************************************
+	 * Resumes a suspension.
+	 *
+	 * @param rSuspension The suspension to resume
+	 * @param rInput      The input for the resumed step
+	 */
+	<I> void resumeSuspension(Suspension<I> rSuspension, I rInput)
+	{
+		assert rCurrentSuspension == rSuspension;
+
+		if (!isCancelled())
+		{
+			CompletableFuture<I> fResume =
+				CompletableFuture.supplyAsync(() -> rInput, this);
+
+			// the resume step is always either a StepChain which contains it's
+			// own next step or the final step in a coroutine and therefore
+			// rNextStep can be NULL
+			rSuspension.step().runAsync(fResume, null, this);
+		}
+
+		rCurrentSuspension = null;
 	}
 
 	/***************************************

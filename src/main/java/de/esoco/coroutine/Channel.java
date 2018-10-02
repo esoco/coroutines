@@ -272,16 +272,20 @@ public class Channel<T> implements AutoCloseable
 		{
 			Suspension<T> rSuspension = aReceiveQueue.remove();
 
-			T rValue = aChannelData.remove();
+			rSuspension.ifNotCancelled(
+				() ->
+				{
+					T rValue = aChannelData.remove();
 
-			if (rValue != null)
-			{
-				rSuspension.resume(rValue);
-			}
-			else
-			{
-				aReceiveQueue.push(rSuspension);
-			}
+					if (rValue != null)
+					{
+						rSuspension.resume(rValue);
+					}
+					else
+					{
+						aReceiveQueue.push(rSuspension);
+					}
+				});
 		}
 	}
 
@@ -294,14 +298,18 @@ public class Channel<T> implements AutoCloseable
 		{
 			Suspension<T> rSuspension = aSendQueue.remove();
 
-			if (aChannelData.offer(rSuspension.input()))
+			rSuspension.ifNotCancelled(
+				() ->
 			{
-				rSuspension.resume();
-			}
-			else
-			{
-				aSendQueue.push(rSuspension);
-			}
+				if (aChannelData.offer(rSuspension.input()))
+				{
+					rSuspension.resume();
+				}
+				else
+				{
+					aSendQueue.push(rSuspension);
+				}
+			});
 		}
 	}
 }

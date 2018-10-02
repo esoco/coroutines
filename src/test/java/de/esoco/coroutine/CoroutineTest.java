@@ -33,7 +33,6 @@ import static de.esoco.coroutine.CoroutineScope.launch;
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.step.CallSubroutine.call;
 import static de.esoco.coroutine.step.ChannelReceive.receive;
-import static de.esoco.coroutine.step.ChannelSend.send;
 import static de.esoco.coroutine.step.CodeExecution.apply;
 import static de.esoco.coroutine.step.CodeExecution.run;
 import static de.esoco.coroutine.step.CodeExecution.supply;
@@ -45,8 +44,6 @@ import static de.esoco.coroutine.step.Loop.loopWhile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
-import static org.obrel.type.StandardTypes.NAME;
 
 
 /********************************************************************
@@ -69,7 +66,7 @@ public class CoroutineTest
 	 * Test class setup.
 	 */
 	@BeforeClass
-	public static void setupClass()
+	public static void setup()
 	{
 		// suppress stacktraces from error testing
 		Coroutines.getDefaultContext().set(EXCEPTION_HANDLER, t ->{});
@@ -93,10 +90,10 @@ public class CoroutineTest
 				// this will block because the channel is never sent to
 				Continuation<?> ca = run.async(cr);
 
-				// cancel the receive
+				// cancel the scope with the suspended receive
 				run.cancel();
 
-				// await async receive so that states can be checked
+				// await async cancelled receive so that states can be checked
 				run.await();
 
 				assertTrue(ca.isCancelled());
@@ -111,56 +108,6 @@ public class CoroutineTest
 				{
 					// expected
 				}
-			});
-	}
-
-	/***************************************
-	 * Test of asynchronous channel communication.
-	 */
-	@Test
-	public void testChannel()
-	{
-		ChannelId<String> ch = stringChannel("TEST_CH");
-
-		Coroutine<String, String> cs =
-			Coroutine.first(apply((String s) -> s + "test"))
-					 .then(send(ch))
-					 .with(NAME, "Send");
-
-		Coroutine<?, String> cr1 =
-			Coroutine.first(receive(ch))
-					 .with(NAME, "Receive")
-					 .then(apply(s -> s.toUpperCase()));
-		Coroutine<?, String> cr2 =
-			cr1.then(apply((String s) -> s.toLowerCase()));
-
-		launch(
-			run ->
-			{
-				Continuation<String> r1 = run.async(cr1);
-				Continuation<String> r2 = run.async(cr2);
-
-				Continuation<?> s1 = run.async(cs, "123");
-				Continuation<?> s2 = run.async(cs, "456");
-
-				assertEquals("123test", s1.getResult());
-				assertEquals("456test", s2.getResult());
-
-				String r1v = r1.getResult();
-				String r2v = r2.getResult();
-
-				// because of the concurrent execution it is not fixed which
-				// of the values r1 and r2 will receive
-				assertTrue(
-					"123test".equalsIgnoreCase(r1v) ||
-					"456test".equalsIgnoreCase(r1v));
-				assertTrue(
-					"123test".equalsIgnoreCase(r2v) ||
-					"456test".equalsIgnoreCase(r2v));
-				assertTrue(s1.isFinished());
-				assertTrue(s2.isFinished());
-				assertTrue(r1.isFinished());
-				assertTrue(r2.isFinished());
 			});
 	}
 
