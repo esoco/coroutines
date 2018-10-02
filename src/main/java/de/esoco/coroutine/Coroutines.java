@@ -16,6 +16,8 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
+import de.esoco.lib.event.EventDispatcher;
+
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -26,6 +28,7 @@ import org.obrel.core.RelationTypes;
 import org.obrel.type.MetaTypes;
 
 import static org.obrel.core.RelationTypes.newDefaultValueType;
+import static org.obrel.core.RelationTypes.newInitialValueType;
 
 
 /********************************************************************
@@ -48,6 +51,13 @@ public class Coroutines
 	 */
 	public static final RelationType<Consumer<Throwable>> EXCEPTION_HANDLER =
 		newDefaultValueType((Consumer<Throwable>) (t -> t.printStackTrace()));
+
+	/**
+	 * State: coroutine event listeners. Listeners can be set on any level from
+	 * coroutine to context.
+	 */
+	public static final RelationType<EventDispatcher<CoroutineEvent>> COROUTINE_LISTENERS =
+		newInitialValueType(r -> new EventDispatcher<>());
 
 	static
 	{

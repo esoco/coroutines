@@ -21,17 +21,18 @@ import de.esoco.coroutine.step.Iteration;
 import de.esoco.coroutine.step.Loop;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static de.esoco.coroutine.ChannelId.stringChannel;
-import static de.esoco.coroutine.Coroutine.first;
 import static de.esoco.coroutine.CoroutineScope.launch;
+import static de.esoco.coroutine.Coroutines.COROUTINE_LISTENERS;
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
-import static de.esoco.coroutine.step.CallSubroutine.call;
 import static de.esoco.coroutine.step.ChannelReceive.receive;
 import static de.esoco.coroutine.step.CodeExecution.apply;
 import static de.esoco.coroutine.step.CodeExecution.run;
@@ -219,6 +220,41 @@ public class CoroutineTest
 				assertEquals(Arrays.asList("A", "B", "C", "D"), ca.getResult());
 				assertEquals(Arrays.asList("A", "B", "C", "D"), cb.getResult());
 			});
+	}
+
+	/***************************************
+	 * Test of coroutines with a single step.
+	 */
+	@Test
+	public void testListener()
+	{
+		Set<String>				  aEvents = new HashSet<>();
+		Coroutine<String, String> cr	  =
+			Coroutine.first(apply((String s) -> s.toUpperCase()));
+
+		cr.get(COROUTINE_LISTENERS).add(e -> aEvents.add("CR-" + e.getType()));
+		Coroutines.getDefaultContext()
+				  .get(COROUTINE_LISTENERS)
+				  .add(e -> aEvents.add("CTX-" + e.getType()));
+
+		launch(
+			run ->
+			{
+				run.get(COROUTINE_LISTENERS)
+				.add(e -> aEvents.add("SCOPE-" + e.getType()));
+
+				Continuation<String> c = run.async(cr, "test");
+
+				c.await();
+				assertTrue(c.isFinished());
+			});
+
+		assertTrue(aEvents.contains("CR-STARTED"));
+		assertTrue(aEvents.contains("CR-FINISHED"));
+		assertTrue(aEvents.contains("SCOPE-STARTED"));
+		assertTrue(aEvents.contains("SCOPE-FINISHED"));
+		assertTrue(aEvents.contains("CTX-STARTED"));
+		assertTrue(aEvents.contains("CTX-FINISHED"));
 	}
 
 	/***************************************

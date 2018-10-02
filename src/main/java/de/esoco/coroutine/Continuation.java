@@ -17,6 +17,7 @@
 package de.esoco.coroutine;
 
 import de.esoco.coroutine.Coroutine.Subroutine;
+import de.esoco.coroutine.CoroutineEvent.EventType;
 
 import de.esoco.lib.concurrent.RunLock;
 
@@ -30,9 +31,11 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.obrel.core.Relatable;
 import org.obrel.core.RelatedObject;
 import org.obrel.core.RelationType;
 
+import static de.esoco.coroutine.Coroutines.COROUTINE_LISTENERS;
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.Coroutines.closeManagedResources;
 
@@ -87,7 +90,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 		this.rScope = rScope;
 
 		aCoroutineStack.push(rCoroutine);
+
 		rScope.coroutineStarted(this);
+		notifyListeners(EventType.STARTED);
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -506,6 +511,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 			}
 
 			rScope.coroutineFinished(this);
+			notifyListeners(EventType.FINISHED);
 		}
 		finally
 		{
@@ -562,5 +568,29 @@ public class Continuation<T> extends RelatedObject implements Executor
 	void subroutineStarted(Subroutine<?, ?, ?> rSubroutine)
 	{
 		aCoroutineStack.push(rSubroutine);
+	}
+
+	/***************************************
+	 * Notifies the coroutine listeners that are registered in the coroutine,
+	 * the scope, and the context.
+	 *
+	 * @param eType The event type
+	 */
+	private void notifyListeners(EventType eType)
+	{
+		Relatable[] rSources =
+			new Relatable[]
+			{
+				aCoroutineStack.peek(), rScope, rScope.context()
+			};
+
+		for (Relatable rSource : rSources)
+		{
+			if (rSource.hasRelation(COROUTINE_LISTENERS))
+			{
+				rSource.get(COROUTINE_LISTENERS)
+					   .dispatch(new CoroutineEvent(this, eType));
+			}
+		}
 	}
 }
