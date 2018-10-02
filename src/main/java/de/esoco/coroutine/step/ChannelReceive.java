@@ -33,10 +33,6 @@ import org.obrel.core.RelationType;
  * will be queried (and if not existing created) with {@link
  * CoroutineScope#getChannel(ChannelId)}.
  *
- * <p>A receive step can be chained to arbitrary other execution steps that
- * produce a value of the generic type I but that input value will be
- * ignored.</p>
- *
  * @author eso
  */
 public class ChannelReceive<T> extends ChannelStep<Void, T>

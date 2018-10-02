@@ -55,7 +55,7 @@ public class CoroutineTest
 {
 	//~ Static fields/initializers ---------------------------------------------
 
-	private static Coroutine<String, Integer> PARSE_INT =
+	static Coroutine<String, Integer> PARSE_INT =
 		Coroutine.first(apply((String s) -> s + 5))
 				 .then(apply(s -> s.replaceAll("\\D", "")))
 				 .then(apply(s -> Integer.valueOf(s)));
@@ -279,63 +279,6 @@ public class CoroutineTest
 
 				assertEquals("TEST", ca.getResult());
 				assertEquals("TEST", cb.getResult());
-				assertTrue(ca.isFinished());
-				assertTrue(cb.isFinished());
-			});
-	}
-
-	/***************************************
-	 * Test of subroutine invocations.
-	 */
-	@Test
-	public void testSubroutine()
-	{
-		Coroutine<String, Integer> cr =
-			Coroutine.first(call(PARSE_INT)).then(apply(i -> i + 10));
-
-		launch(
-			run ->
-			{
-				Continuation<Integer> ca = run.async(cr, "test1234");
-				Continuation<Integer> cb = run.blocking(cr, "test1234");
-
-				assertEquals(Integer.valueOf(12355), ca.getResult());
-				assertEquals(Integer.valueOf(12355), cb.getResult());
-				assertTrue(ca.isFinished());
-				assertTrue(cb.isFinished());
-			});
-	}
-
-	/***************************************
-	 * Test of early subroutine termination.
-	 */
-	@Test
-	public void testSubroutineTermination()
-	{
-		Coroutine<Boolean, String> cr =
-			first(
-				call(
-					first(
-						doIf(
-							(Boolean b) -> b == Boolean.TRUE,
-							supply(() -> "TRUE")))));
-
-		launch(
-			run ->
-			{
-				Continuation<String> ca = run.async(cr, false);
-				Continuation<String> cb = run.blocking(cr, false);
-
-				assertEquals(null, ca.getResult());
-				assertEquals(null, cb.getResult());
-				assertTrue(ca.isFinished());
-				assertTrue(cb.isFinished());
-
-				ca = run.async(cr, true);
-				cb = run.blocking(cr, true);
-
-				assertEquals("TRUE", ca.getResult());
-				assertEquals("TRUE", cb.getResult());
 				assertTrue(ca.isFinished());
 				assertTrue(cb.isFinished());
 			});

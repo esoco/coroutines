@@ -25,7 +25,16 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 
 /********************************************************************
- * A channel that allows communication between {@link Coroutine Coroutines}.
+ * A channel that allows communication between {@link Coroutine Coroutines}. A
+ * channel has a fixed capacity and suspends any further sending of data after
+ * the capacity has been reached until capacity becomes available again when
+ * data is requested by receivers. Receiving will be suspended if no more data
+ * is available in a channel.
+ *
+ * <p>Channels can be closed by invoking {@link #close()}. A closed channel
+ * rejects any further send or receive calls by throwing a {@link
+ * ChannelClosedException}. Upon a close all pending suspensions will also be
+ * failed with that exception.</p>
  *
  * @author eso
  */
