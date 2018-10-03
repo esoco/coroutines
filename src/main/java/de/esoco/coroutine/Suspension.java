@@ -41,25 +41,23 @@ public class Suspension<T>
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance. The input value may be NULL if it will only
-	 * become available when the suspension is resumed (e.g. when receiving
-	 * data). The step may also be NULL if the suspension occurs in the last
-	 * step of a coroutine. In that case the {@link #resume()} methods do
-	 * nothing but this instance can still be used to store the suspended state
-	 * until the suspension ends and the associated action is performed (e.g.
-	 * sending data).
+	 * Creates a new instance. The input value for the resume step is not
+	 * provided here because it is typically not available upon suspension
+	 * because it will only become available when the suspension is resumed
+	 * (e.g. when receiving data). To resume execution with an explicit input
+	 * value the method {@link #resume(Object)} can be used. If the resume
+	 * should occur at a different time than the availability of the input value
+	 * a suspension can be updated by calling {@link #withInput(Object)}. In
+	 * that case {@link #resume()} can be used later to resume the execution.
 	 *
-	 * @param rInput          The input value to the step or NULL for none
 	 * @param rSuspendingStep The step that initiated the suspension
 	 * @param rResumeStep     The step to resume the execution with
 	 * @param rContinuation   The continuation of the execution
 	 */
-	public Suspension(T					  rInput,
-					  CoroutineStep<?, T> rSuspendingStep,
+	public Suspension(CoroutineStep<?, T> rSuspendingStep,
 					  CoroutineStep<T, ?> rResumeStep,
 					  Continuation<?>	  rContinuation)
 	{
-		this.rInput			 = rInput;
 		this.rSuspendingStep = rSuspendingStep;
 		this.rResumeStep     = rResumeStep;
 		this.rContinuation   = rContinuation;

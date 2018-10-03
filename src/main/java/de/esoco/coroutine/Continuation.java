@@ -447,10 +447,10 @@ public class Continuation<T> extends RelatedObject implements Executor
 	/***************************************
 	 * Suspends a step for later invocation and returns an instance of {@link
 	 * Suspension} that contains the state necessary for resuming the execution.
-	 * Other than {@link #suspend(CoroutineStep, CoroutineStep, Object)} this
-	 * suspension will not contain an explicit input value. Such suspensions are
-	 * used if the input will only become available when the suspension ends
-	 * (e.g. when receiving data asynchronously).
+	 * The suspension will not contain an input value because it is typically
+	 * not know upon suspendsion. It must be provided later, either when
+	 * resuming with {@link Suspension#resume(Object)} or by setting it into the
+	 * suspension with {@link Suspension#withInput(Object)}.
 	 *
 	 * @param  rSuspendingStep The step initiating the suspension
 	 * @param  rSuspendedStep  The step to suspend
@@ -461,30 +461,11 @@ public class Continuation<T> extends RelatedObject implements Executor
 		CoroutineStep<?, V> rSuspendingStep,
 		CoroutineStep<V, ?> rSuspendedStep)
 	{
-		return suspend(rSuspendingStep, rSuspendedStep, null);
-	}
-
-	/***************************************
-	 * Suspends a step for later invocation and returns an instance of {@link
-	 * Suspension} that contains the state necessary for resuming the execution.
-	 * If the input value is not known before the suspension ends the method
-	 * {@link #suspend(CoroutineStep, CoroutineStep)} can be used instead.
-	 *
-	 * @param  rSuspendingStep The step initiating the suspension
-	 * @param  rSuspendedStep  The step to suspend
-	 * @param  rInput          The input value for the execution
-	 *
-	 * @return A new suspension object
-	 */
-	public <V> Suspension<V> suspend(CoroutineStep<?, V> rSuspendingStep,
-									 CoroutineStep<V, ?> rSuspendedStep,
-									 V					 rInput)
-	{
 		// only one suspension per continuation is possible
 		assert rCurrentSuspension == null;
 
 		Suspension<V> aSuspension =
-			new Suspension<>(rInput, rSuspendingStep, rSuspendedStep, this);
+			new Suspension<>(rSuspendingStep, rSuspendedStep, this);
 
 		rScope.addSuspension(aSuspension);
 		rCurrentSuspension = aSuspension;
