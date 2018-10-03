@@ -43,14 +43,14 @@ import static de.esoco.coroutine.Coroutines.closeManagedResources;
 /********************************************************************
  * A continuation represents the state of a coroutine execution. It can be used
  * to carry state between coroutine execution steps by setting relations on it.
- * The method {@link Coroutine#then(java.util.function.BiFunction)} gives the
- * code of a step access to the current continuation it is running in.
+ * The method {@link Coroutine#then(CoroutineStep)} gives the code of a step
+ * access to the current continuation it is running in.
  *
  * <p>This class also implements the {@link Future} interface and can therefore
  * be used like any other Java future. The only limitation is that due to the
  * cooperative concurrency of coroutines it is not possible to immediately
  * interrupt a coroutine execution. Therefore the boolean parameter of the
- * method {@link #cancel(boolean)} is ignored.</p>
+ * method {@link #cancel()} is ignored.</p>
  *
  * <p>If a continuation has been cancelled all blocking {@link Future} methods
  * will throw a {@link CancellationException} after the wait lock is
@@ -291,9 +291,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
-	 * A variant of {@link #get()} to access the coroutine execution result
-	 * without throwing a checked exception. If this continuation has been
-	 * cancelled a {@link CancellationException} will be thrown.
+	 * Reurn the result of the coroutine execution. If this continuation has
+	 * been cancelled a {@link CancellationException} will be thrown. If it has
+	 * failed with an error a {@link CoroutineException} will be thrown.
 	 *
 	 * @return The result
 	 */
@@ -412,7 +412,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	/***************************************
 	 * Suspends a step for later invocation and returns an instance of {@link
 	 * Suspension} that contains the state necessary for resuming the execution.
-	 * Other than {@link #suspend(Continuation, Object)} this suspension will
+	 * Other than {@link #suspend(CoroutineStep, Object)} this suspension will
 	 * not contain an explicit input value. Such suspensions are used if the
 	 * input will only become available when the suspension ends (e.g. when
 	 * receiving data asynchronously).
@@ -430,7 +430,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 * Suspends a step for later invocation and returns an instance of {@link
 	 * Suspension} that contains the state necessary for resuming the execution.
 	 * If the input value is not known before the suspension ends the method
-	 * {@link #suspend(Continuation)} can be used instead.
+	 * {@link #suspend(CoroutineStep)} can be used instead.
 	 *
 	 * @param  rStep  The step to suspend
 	 * @param  rInput The input value for the execution
@@ -455,13 +455,13 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 * finished execution and {@link #finish(Object)} has been invoked. The
 	 * given code will always be run asynchronously after the execution has
 	 * finished. If the execution of the coroutine is cancelled (by invoking
-	 * {@link #cancel(boolean)}) the code will not be invoked.
+	 * {@link #cancel()}) the code will not be invoked.
 	 *
 	 * @param  fRunWhenDone The function to apply when the execution has
 	 *                      finished
 	 *
-	 * @return This instance to allow further invocations like {@link #get()} or
-	 *         {@link #await()}
+	 * @return This instance to allow further invocations like {@link
+	 *         #getResult()} or {@link #await()}
 	 */
 	public Continuation<T> then(Function<T, ?> fRunWhenDone)
 	{

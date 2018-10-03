@@ -27,26 +27,27 @@ import static org.obrel.type.StandardTypes.NAME;
 
 
 /********************************************************************
- * This is the base class for all execution steps of coroutines. For simple
- * steps it is sufficient to implement the single abstract method {@link
- * #execute(Object, Continuation)} which must perform the actual code execution.
- * The default implementations of {@link #runBlocking(Object, Continuation)} and
+ * This is the base class for all steps of coroutines. For simple steps it is
+ * sufficient to implement the single abstract method {@link #execute(Object,
+ * Continuation)} which must perform the actual (blocking) code execution. The
+ * default implementations of {@link #runBlocking(Object, Continuation)} and
  * {@link #runAsync(CompletableFuture, CoroutineStep, Continuation)} then invoke
  * this method as needed.
  *
- * <p>In most cases it is not necessary to subclass this class because the
- * 'step' sub-package already contains implementations of commons steps. For
- * example, a simple code execution can be achieved by putting a closure in to
- * an instance of the {@link CodeExecution} step.</p>
+ * <p>In most cases it is not necessary to extend this class because the 'step'
+ * sub-package already contains implementations of several common steps. For
+ * example, a simple code execution can be achieved by wrapping a closure in an
+ * instance of the {@link CodeExecution} step.</p>
  *
  * <p>Creating a new step subclass is only needed to implement advanced
  * coroutine suspensions that are not already provided by existing steps. In
  * such a case it is typically also necessary to override the method {@link
  * #runAsync(CompletableFuture, CoroutineStep, Continuation)} to check for the
  * suspension condition. If a suspension is necessary a {@link Suspension}
- * object can be created by invoking a {@link #suspend(Continuation, Object)}
- * method. The object can then be used by code that waits for some external
- * condition to resume the coroutine when appropriate.</p>
+ * object can be created by invoking {@link Continuation#suspend(CoroutineStep)}
+ * for the current step. The suspension object can then be used by code that
+ * waits for some external condition to resume the coroutine when
+ * appropriate.</p>
  *
  * <p>It is recommended that a step implementation provides one or more static
  * factory methods alongside the constructor(s). These factory methods can then
@@ -76,12 +77,15 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 	 *
 	 * <p>Subclasses that need to suspend the invocation of the next step until
 	 * some condition is met (e.g. sending or receiving data has finished) need
-	 * to override this method and call {@link #resume(Object, Continuation)} on
-	 * the next step if the suspension ends.</p>
+	 * to override this method and create a {@link Suspension} by invoking
+	 * {@link Continuation#suspend(CoroutineStep)} on the next step. If the
+	 * condition that caused the suspension resolves the coroutine execution can
+	 * be resumed by calling {@link Suspension#resume(Object)}.</p>
 	 *
 	 * <p>Subclasses that override this method also need to handle errors by
-	 * terminating any further execution and forwarding the causing exception to
-	 * {@link Continuation#fail(Throwable)}.</p>
+	 * terminating any further execution (i.e. not resuming the suspension) and
+	 * forwarding the causing exception to {@link
+	 * Continuation#fail(Throwable)}.</p>
 	 *
 	 * @param fPreviousExecution The future of the previous code execution
 	 * @param rNextStep          The next step to execute or NULL for none

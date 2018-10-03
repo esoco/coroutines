@@ -21,7 +21,6 @@ import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspension;
-import de.esoco.coroutine.step.nio.AsynchronousChannelStep.ChannelCallback;
 
 import java.io.IOException;
 
@@ -104,11 +103,11 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 	}
 
 	/***************************************
-	 * Implementation of the {@link ChannelOperation} functional interface
-	 * method signature.
+	 * Implementation of the ChannelOperation functional interface method
+	 * signature.
 	 *
-	 * @see ChannelOperation#execute(int, AsynchronousChannel, ByteBuffer,
-	 *      ChannelCallback)
+	 * @see AsynchronousChannelStep.ChannelOperation#execute(int,java.nio.channels.AsynchronousChannel,
+	 *      ByteBuffer, AsynchronousChannelStep.ChannelCallback)
 	 */
 	protected abstract boolean performAsyncOperation(
 		int													nBytesProcessed,

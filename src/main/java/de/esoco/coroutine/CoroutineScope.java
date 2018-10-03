@@ -78,9 +78,9 @@ public class CoroutineScope extends CoroutineEnvironment
 	 *
 	 * @see   #launch(CoroutineContext, ScopeCode)
 	 */
-	public static void launch(ScopeCode rBuilder)
+	public static void launch(ScopeCode rCode)
 	{
-		launch(null, rBuilder);
+		launch(null, rCode);
 	}
 
 	/***************************************

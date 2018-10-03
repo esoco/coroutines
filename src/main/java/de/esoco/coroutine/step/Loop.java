@@ -74,7 +74,7 @@ public class Loop<T> extends CoroutineStep<T, T>
 	 * @param  pCondition  The condition to check for TRUE to continue looping
 	 * @param  rLoopedStep The step to execute in the loop
 	 *
-	 * @return
+	 * @return A new step instance
 	 */
 	public static <T> Loop<T> loopWhile(
 		BiPredicate<? super T, Continuation<?>> pCondition,
@@ -95,7 +95,7 @@ public class Loop<T> extends CoroutineStep<T, T>
 	 * @param  pCondition  The condition to check for TRUE to continue looping
 	 * @param  rLoopedStep The step to execute in the loop
 	 *
-	 * @return
+	 * @return A new step instance
 	 */
 	public static <T> Loop<T> loopWhile(
 		Predicate<T>		pCondition,
