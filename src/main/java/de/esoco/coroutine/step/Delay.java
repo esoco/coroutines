@@ -144,7 +144,7 @@ public class Delay<T> extends CoroutineStep<T, T>
 		Suspension<T> rSuspension = rContinuation.suspend(rNextStep);
 
 		fPreviousExecution.thenAcceptAsync(
-				  			i ->
+				  			t ->
 				  			{
 				  				Pair<Long, TimeUnit> rDuration =
 				  					getDuration(rContinuation);
@@ -153,7 +153,9 @@ public class Delay<T> extends CoroutineStep<T, T>
 				  				.getScheduler()
 				  				.schedule(
 				  					() ->
-				  						rSuspension.resume(i),
+				  						rSuspension.ifNotCancelled(
+				  							() ->
+				  								rSuspension.resume(t)),
 				  					rDuration.first(),
 				  					rDuration.second());
 				  			},
