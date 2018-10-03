@@ -93,13 +93,19 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<ByteBuffer> fPreviousExecution,
-						 CoroutineStep<ByteBuffer, ?>  rNextStep,
-						 Continuation<?>			   rContinuation)
+	public Suspension<ByteBuffer> runAsync(
+		CompletableFuture<ByteBuffer> fPreviousExecution,
+		CoroutineStep<ByteBuffer, ?>  rNextStep,
+		Continuation<?>				  rContinuation)
 	{
+		Suspension<ByteBuffer> rSuspension =
+			rContinuation.suspend(this, rNextStep);
+
 		fPreviousExecution.thenAcceptAsync(
-			b -> connectAsync(b, rContinuation.suspend(this, rNextStep)),
+			b -> connectAsync(b, rSuspension),
 			rContinuation);
+
+		return rSuspension;
 	}
 
 	/***************************************

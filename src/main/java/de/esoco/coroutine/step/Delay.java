@@ -137,9 +137,9 @@ public class Delay<T> extends CoroutineStep<T, T>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<T> fPreviousExecution,
-						 CoroutineStep<T, ?>  rNextStep,
-						 Continuation<?>	  rContinuation)
+	public Suspension<T> runAsync(CompletableFuture<T> fPreviousExecution,
+								  CoroutineStep<T, ?>  rNextStep,
+								  Continuation<?>	   rContinuation)
 	{
 		Suspension<T> rSuspension = rContinuation.suspend(this, rNextStep);
 
@@ -162,6 +162,8 @@ public class Delay<T> extends CoroutineStep<T, T>
 				  			rContinuation)
 						  .exceptionally(t ->
 				  				rContinuation.fail(t));
+
+		return rSuspension;
 	}
 
 	/***************************************

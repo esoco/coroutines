@@ -573,9 +573,9 @@ public class Coroutine<I, O> extends RelatedObject
 		 * {@inheritDoc}
 		 */
 		@Override
-		public void runAsync(CompletableFuture<I> fPreviousExecution,
-							 CoroutineStep<O, ?>  rAlwaysNull,
-							 Continuation<?>	  rContinuation)
+		public Suspension<O> runAsync(CompletableFuture<I> fPreviousExecution,
+									  CoroutineStep<O, ?>  rAlwaysNull,
+									  Continuation<?>	   rContinuation)
 		{
 			if (!rContinuation.isCancelled())
 			{
@@ -596,6 +596,8 @@ public class Coroutine<I, O> extends RelatedObject
 					rContinuation.fail(e);
 				}
 			}
+
+			return null;
 		}
 
 		/***************************************
@@ -745,13 +747,16 @@ public class Coroutine<I, O> extends RelatedObject
 		 * {@inheritDoc}
 		 */
 		@Override
-		public void runAsync(CompletableFuture<I> fPreviousExecution,
-							 CoroutineStep<O, ?>  rNextStep,
-							 Continuation<?>	  rContinuation)
+		public Suspension<O> runAsync(CompletableFuture<I> fPreviousExecution,
+									  CoroutineStep<O, ?>  rNextStep,
+									  Continuation<?>	   rContinuation)
 		{
 			rContinuation.subroutineFinished();
 
-			rReturnStep.runAsync(fPreviousExecution, rNextStep, rContinuation);
+			return rReturnStep.runAsync(
+				fPreviousExecution,
+				rNextStep,
+				rContinuation);
 		}
 
 		/***************************************

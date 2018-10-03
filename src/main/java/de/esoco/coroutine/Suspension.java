@@ -29,8 +29,9 @@ public class Suspension<T>
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private final T					  rInput;
-	private CoroutineStep<?, T>		  rSuspendingStep;
+	private T rInput;
+
+	private final CoroutineStep<?, T> rSuspendingStep;
 	private final CoroutineStep<T, ?> rResumeStep;
 	private final Continuation<?>     rContinuation;
 
@@ -182,5 +183,20 @@ public class Suspension<T>
 	public final CoroutineStep<?, T> suspendingStep()
 	{
 		return rSuspendingStep;
+	}
+
+	/***************************************
+	 * Sets the input value and returns this instance so that it can be used as
+	 * an updated argument to method calls.
+	 *
+	 * @param  rInput The new input value
+	 *
+	 * @return This instance
+	 */
+	public Suspension<T> withInput(T rInput)
+	{
+		this.rInput = rInput;
+
+		return this;
 	}
 }

@@ -457,9 +457,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 *
 	 * @return A new suspension object
 	 */
-	public <I> Suspension<I> suspend(
-		CoroutineStep<?, I> rSuspendingStep,
-		CoroutineStep<I, ?> rSuspendedStep)
+	public <V> Suspension<V> suspend(
+		CoroutineStep<?, V> rSuspendingStep,
+		CoroutineStep<V, ?> rSuspendedStep)
 	{
 		return suspend(rSuspendingStep, rSuspendedStep, null);
 	}
@@ -476,14 +476,14 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 *
 	 * @return A new suspension object
 	 */
-	public <I> Suspension<I> suspend(CoroutineStep<?, I> rSuspendingStep,
-									 CoroutineStep<I, ?> rSuspendedStep,
-									 I					 rInput)
+	public <V> Suspension<V> suspend(CoroutineStep<?, V> rSuspendingStep,
+									 CoroutineStep<V, ?> rSuspendedStep,
+									 V					 rInput)
 	{
 		// only one suspension per continuation is possible
 		assert rCurrentSuspension == null;
 
-		Suspension<I> aSuspension =
+		Suspension<V> aSuspension =
 			new Suspension<>(rInput, rSuspendingStep, rSuspendedStep, this);
 
 		rScope.addSuspension(aSuspension);

@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,8 +18,9 @@ package de.esoco.coroutine.step;
 
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
-import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Coroutine.Subroutine;
+import de.esoco.coroutine.CoroutineStep;
+import de.esoco.coroutine.Suspension;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -71,15 +72,17 @@ public class CallSubroutine<I, O> extends CoroutineStep<I, O>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<I> fPreviousExecution,
-						 CoroutineStep<O, ?>  rReturnStep,
-						 Continuation<?>	  rContinuation)
+	public Suspension<O> runAsync(CompletableFuture<I> fPreviousExecution,
+								  CoroutineStep<O, ?>  rReturnStep,
+								  Continuation<?>	   rContinuation)
 	{
 		// subroutine needs to be created on invocation because the return step
 		// may change between invocations
 		new Subroutine<>(rCoroutine, rReturnStep).runAsync(
 			fPreviousExecution,
 			rContinuation);
+
+		return null;
 	}
 
 	/***************************************

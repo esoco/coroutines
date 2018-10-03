@@ -44,9 +44,9 @@ import static org.obrel.type.StandardTypes.NAME;
  * such a case it is typically also necessary to override the method {@link
  * #runAsync(CompletableFuture, CoroutineStep, Continuation)} to check for the
  * suspension condition. If a suspension is necessary a {@link Suspension}
- * object can be created by invoking {@link Continuation#suspend(CoroutineStep, CoroutineStep)}
- * for the current step. The suspension object can then be used by code that
- * waits for some external condition to resume the coroutine when
+ * object can be created by invoking {@link Continuation#suspend(CoroutineStep,
+ * CoroutineStep)} for the current step. The suspension object can then be used
+ * by code that waits for some external condition to resume the coroutine when
  * appropriate.</p>
  *
  * <p>It is recommended that a step implementation provides one or more static
@@ -78,22 +78,26 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 	 * <p>Subclasses that need to suspend the invocation of the next step until
 	 * some condition is met (e.g. sending or receiving data has finished) need
 	 * to override this method and create a {@link Suspension} by invoking
-	 * {@link Continuation#suspend(CoroutineStep, CoroutineStep)} on the next step. If the
-	 * condition that caused the suspension resolves the coroutine execution can
-	 * be resumed by calling {@link Suspension#resume(Object)}.</p>
+	 * {@link Continuation#suspend(CoroutineStep, CoroutineStep)} on the next
+	 * step. If the condition that caused the suspension resolves the coroutine
+	 * execution can be resumed by calling {@link
+	 * Suspension#resume(Object)}.</p>
 	 *
 	 * <p>Subclasses that override this method also need to handle errors by
 	 * terminating any further execution (i.e. not resuming the suspension) and
 	 * forwarding the causing exception to {@link
 	 * Continuation#fail(Throwable)}.</p>
 	 *
-	 * @param fPreviousExecution The future of the previous code execution
-	 * @param rNextStep          The next step to execute or NULL for none
-	 * @param rContinuation      The continuation of the execution
+	 * @param  fPreviousExecution The future of the previous code execution
+	 * @param  rNextStep          The next step to execute or NULL for none
+	 * @param  rContinuation      The continuation of the execution
+	 *
+	 * @return In the case of {@link Suspending} steps the suspension created or
+	 *         NULL otherwise
 	 */
-	public void runAsync(CompletableFuture<I> fPreviousExecution,
-						 CoroutineStep<O, ?>  rNextStep,
-						 Continuation<?>	  rContinuation)
+	public Suspension<O> runAsync(CompletableFuture<I> fPreviousExecution,
+								  CoroutineStep<O, ?>  rNextStep,
+								  Continuation<?>	   rContinuation)
 	{
 		CompletableFuture<O> fExecution =
 			fPreviousExecution.thenApplyAsync(
@@ -112,6 +116,8 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 			// only add exception handler to the end of a chain, i.e. next == null
 			fExecution.exceptionally(e -> fail(e, rContinuation));
 		}
+
+		return null;
 	}
 
 	/***************************************

@@ -20,6 +20,7 @@ import de.esoco.coroutine.ChannelId;
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
+import de.esoco.coroutine.Suspension;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -99,17 +100,21 @@ public class ChannelSend<T> extends ChannelStep<T, T>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<T> fPreviousExecution,
-						 CoroutineStep<T, ?>  rNextStep,
-						 Continuation<?>	  rContinuation)
+	public Suspension<T> runAsync(CompletableFuture<T> fPreviousExecution,
+								  CoroutineStep<T, ?>  rNextStep,
+								  Continuation<?>	   rContinuation)
 	{
+		Suspension<T> rSuspension = rContinuation.suspend(this, rNextStep);
+
 		fPreviousExecution.thenAcceptAsync(
 				  			v ->
 				  				getChannel(rContinuation).sendSuspending(
-				  					rContinuation.suspend(this, rNextStep, v)),
+				  					rSuspension.withInput(v)),
 				  			rContinuation)
 						  .exceptionally(t ->
 				  				rContinuation.fail(t));
+
+		return rSuspension;
 	}
 
 	/***************************************
