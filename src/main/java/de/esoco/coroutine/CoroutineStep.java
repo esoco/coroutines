@@ -166,4 +166,14 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 
 		return null;
 	}
+
+	/***************************************
+	 * Allow subclasses to terminate the coroutine they currently run in.
+	 *
+	 * @param rContinuation The continuation of the current execution
+	 */
+	protected void terminateCoroutine(Continuation<?> rContinuation)
+	{
+		rContinuation.getCurrentCoroutine().terminate(rContinuation);
+	}
 }

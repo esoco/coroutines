@@ -203,8 +203,7 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 				}
 				else
 				{
-					rContinuation.getCurrentCoroutine()
-					.terminate(rContinuation);
+					terminateCoroutine(rContinuation);
 				}
 			},
 			rContinuation);

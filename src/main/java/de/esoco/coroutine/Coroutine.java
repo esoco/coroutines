@@ -261,24 +261,23 @@ public class Coroutine<I, O> extends RelatedObject
 		return new Coroutine<>(rStep);
 	}
 
-	//~ Methods ----------------------------------------------------------------
-
 	/***************************************
-	 * Terminates the asynchronous execution of this coroutine by invoking it's
-	 * last step with an input value of NULL. This method should be invoked by
-	 * steps that need to end the execution of their coroutine early (e.g. if a
-	 * condition is not met).
+	 * A variant of {@link #first(CoroutineStep)} that also sets an explicit
+	 * step name. Naming steps can help debugging coroutines.
 	 *
-	 * @param rContinuation The continuation of the execution
+	 * @param  sStepName A name that identifies this step in this coroutine
+	 * @param  rStep     The step to execute
+	 *
+	 * @return The new coroutine
 	 */
-	public void terminate(Continuation<?> rContinuation)
+	public static <I, O> Coroutine<I, O> first(
+		String				sStepName,
+		CoroutineStep<I, O> rStep)
 	{
-		aCode.getLastStep()
-			 .runAsync(
-	 			CompletableFuture.supplyAsync(() -> null, rContinuation),
-	 			null,
-	 			rContinuation);
+		return first(rStep.with(NAME, sStepName));
 	}
+
+	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
 	 * Returns a new coroutine that executes additional code after that of this
@@ -322,8 +321,6 @@ public class Coroutine<I, O> extends RelatedObject
 	 * @param  rStep     The step to execute
 	 *
 	 * @return The new coroutine
-	 *
-	 * @see    #then(CoroutineStep)
 	 */
 	public <T> Coroutine<I, T> then(String				sStepName,
 									CoroutineStep<O, T> rStep)
@@ -433,6 +430,23 @@ public class Coroutine<I, O> extends RelatedObject
 		aRunCoroutine.aCode.runBlocking(rInput, aContinuation);
 
 		return aContinuation;
+	}
+
+	/***************************************
+	 * Terminates the asynchronous execution of this coroutine by invoking it's
+	 * last step with an input value of NULL. This method should be invoked by
+	 * steps that need to end the execution of their coroutine early (e.g. if a
+	 * condition is not met).
+	 *
+	 * @param rContinuation The continuation of the execution
+	 */
+	void terminate(Continuation<?> rContinuation)
+	{
+		aCode.getLastStep()
+			 .runAsync(
+	 			CompletableFuture.supplyAsync(() -> null, rContinuation),
+	 			null,
+	 			rContinuation);
 	}
 
 	//~ Inner Classes ----------------------------------------------------------
