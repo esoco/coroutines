@@ -19,6 +19,7 @@ package de.esoco.coroutine;
 import de.esoco.lib.event.EventDispatcher;
 
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.obrel.core.Relatable;
@@ -29,10 +30,13 @@ import org.obrel.type.MetaTypes;
 
 import static org.obrel.core.RelationTypes.newDefaultValueType;
 import static org.obrel.core.RelationTypes.newInitialValueType;
+import static org.obrel.core.RelationTypes.newType;
 
 
 /********************************************************************
- * Contains global {@link Coroutine} management functions.
+ * Contains global {@link Coroutine} management functions and relation types. If
+ * not stated otherwise the configuration relation types can be set on any level
+ * from coroutine to context.
  *
  * @author eso
  */
@@ -53,11 +57,30 @@ public class Coroutines
 		newDefaultValueType((Consumer<Throwable>) (t -> t.printStackTrace()));
 
 	/**
-	 * State: coroutine event listeners. Listeners can be set on any level from
-	 * coroutine to context.
+	 * Configuration: coroutine event listeners that will be invoked when
+	 * coroutines are started or finished.
 	 */
 	public static final RelationType<EventDispatcher<CoroutineEvent>> COROUTINE_LISTENERS =
 		newInitialValueType(r -> new EventDispatcher<>());
+
+	/**
+	 * Configuration: a single listener for coroutine suspensions. This listener
+	 * will be invoked with the suspension and a boolean value after a coroutine
+	 * has been suspended (TRUE) or before it is resumed (FALSE). This relation
+	 * is intended mainly for debugging purposes.
+	 */
+	public static final RelationType<BiConsumer<Suspension<?>, Boolean>> COROUTINE_SUSPENSION_LISTENER =
+		newType();
+
+	/**
+	 * Configuration: a single listener for coroutine step executions. This
+	 * listener will be invoked with the step and continuation just before a
+	 * step is executed. This relation is intended mainly for debugging
+	 * purposes.
+	 */
+	public static final RelationType<BiConsumer<CoroutineStep<?, ?>,
+												Continuation<?>>> COROUTINE_STEP_LISTENER =
+		newType();
 
 	static
 	{

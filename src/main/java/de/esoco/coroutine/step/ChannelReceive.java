@@ -103,7 +103,7 @@ public class ChannelReceive<T> extends ChannelStep<Void, T>
 		fPreviousExecution.thenAcceptAsync(
 				  			v ->
 				  				getChannel(rContinuation).receiveSuspending(
-				  					rContinuation.suspend(rNextStep)),
+				  					rContinuation.suspend(this, rNextStep)),
 				  			rContinuation)
 						  .exceptionally(t ->
 				  				rContinuation.fail(t));

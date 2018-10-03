@@ -581,6 +581,8 @@ public class Coroutine<I, O> extends RelatedObject
 			{
 				try
 				{
+					rContinuation.trace(rFirstStep);
+
 					// A step chain will always be a second step and is therefore
 					// invoked with a next step argument of NULL. Therefore the next
 					// step of the chain is used here.
@@ -619,6 +621,8 @@ public class Coroutine<I, O> extends RelatedObject
 			{
 				try
 				{
+					rContinuation.trace(rFirstStep);
+
 					return rNextStep.execute(
 						rFirstStep.execute(rInput, rContinuation),
 						rContinuation);

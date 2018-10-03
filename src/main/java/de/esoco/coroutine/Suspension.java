@@ -30,7 +30,8 @@ public class Suspension<T>
 	//~ Instance fields --------------------------------------------------------
 
 	private final T					  rInput;
-	private final CoroutineStep<T, ?> rStep;
+	private CoroutineStep<?, T>		  rSuspendingStep;
+	private final CoroutineStep<T, ?> rResumeStep;
 	private final Continuation<?>     rContinuation;
 
 	private boolean		  bCancelled  = false;
@@ -47,17 +48,20 @@ public class Suspension<T>
 	 * until the suspension ends and the associated action is performed (e.g.
 	 * sending data).
 	 *
-	 * @param rInput        The input value to the step or NULL for none
-	 * @param rStep         The coroutine step to be invoked when resuming
-	 * @param rContinuation The continuation of the execution
+	 * @param rInput          The input value to the step or NULL for none
+	 * @param rSuspendingStep The step that initiated the suspension
+	 * @param rResumeStep     The step to resume the execution with
+	 * @param rContinuation   The continuation of the execution
 	 */
 	public Suspension(T					  rInput,
-					  CoroutineStep<T, ?> rStep,
+					  CoroutineStep<?, T> rSuspendingStep,
+					  CoroutineStep<T, ?> rResumeStep,
 					  Continuation<?>	  rContinuation)
 	{
-		this.rInput		   = rInput;
-		this.rStep		   = rStep;
-		this.rContinuation = rContinuation;
+		this.rInput			 = rInput;
+		this.rSuspendingStep = rSuspendingStep;
+		this.rResumeStep     = rResumeStep;
+		this.rContinuation   = rContinuation;
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -163,10 +167,20 @@ public class Suspension<T>
 	/***************************************
 	 * Returns the step to be execute when resuming.
 	 *
-	 * @return The step
+	 * @return The resume step
 	 */
-	public final CoroutineStep<T, ?> step()
+	public final CoroutineStep<T, ?> resumeStep()
 	{
-		return rStep;
+		return rResumeStep;
+	}
+
+	/***************************************
+	 * Returns the step that initiated this suspension.
+	 *
+	 * @return The suspending step
+	 */
+	public final CoroutineStep<?, T> suspendingStep()
+	{
+		return rSuspendingStep;
 	}
 }

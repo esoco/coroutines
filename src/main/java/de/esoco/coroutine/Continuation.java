@@ -28,6 +28,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -36,6 +38,8 @@ import org.obrel.core.RelatedObject;
 import org.obrel.core.RelationType;
 
 import static de.esoco.coroutine.Coroutines.COROUTINE_LISTENERS;
+import static de.esoco.coroutine.Coroutines.COROUTINE_STEP_LISTENER;
+import static de.esoco.coroutine.Coroutines.COROUTINE_SUSPENSION_LISTENER;
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.Coroutines.closeManagedResources;
 
@@ -60,10 +64,15 @@ import static de.esoco.coroutine.Coroutines.closeManagedResources;
  */
 public class Continuation<T> extends RelatedObject implements Executor
 {
+	//~ Static fields/initializers ---------------------------------------------
+
+	private static final AtomicLong aNextId = new AtomicLong(1);
+
 	//~ Instance fields --------------------------------------------------------
 
 	private final CoroutineScope rScope;
 
+	private final long    nId				 = aNextId.getAndIncrement();
 	private T			  rResult			 = null;
 	private boolean		  bCancelled		 = false;
 	private boolean		  bFinished			 = false;
@@ -75,6 +84,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 	private Deque<Coroutine<?, ?>> aCoroutineStack = new ArrayDeque<>();
 	private final CountDownLatch   aFinishSignal   = new CountDownLatch(1);
 	private final RunLock		   aStateLock	   = new RunLock();
+
+	BiConsumer<Suspension<?>, Boolean>				 fSuspensionListener = null;
+	BiConsumer<CoroutineStep<?, ?>, Continuation<?>> fStepListener		 = null;
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -90,6 +102,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 		this.rScope = rScope;
 
 		aCoroutineStack.push(rCoroutine);
+
+		fSuspensionListener = getConfiguration(COROUTINE_SUSPENSION_LISTENER);
+		fStepListener	    = getConfiguration(COROUTINE_STEP_LISTENER);
 
 		rScope.coroutineStarted(this);
 		notifyListeners(EventType.STARTED);
@@ -281,6 +296,16 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
+	 * Returns the current suspension.
+	 *
+	 * @return The current suspension or NULL for none
+	 */
+	public final Suspension<?> getCurrentSuspension()
+	{
+		return rCurrentSuspension;
+	}
+
+	/***************************************
 	 * Returns the error exception that caused a coroutine cancelation.
 	 *
 	 * @return The error or NULL for none
@@ -375,6 +400,16 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
+	 * Returns the unique ID of this instance.
+	 *
+	 * @return The continuation ID
+	 */
+	public final long id()
+	{
+		return nId;
+	}
+
+	/***************************************
 	 * Checks if the execution of the coroutine has been cancelled. If it has
 	 * been cancelled because of and error the method {@link #getError()} will
 	 * return an exception.
@@ -412,40 +447,52 @@ public class Continuation<T> extends RelatedObject implements Executor
 	/***************************************
 	 * Suspends a step for later invocation and returns an instance of {@link
 	 * Suspension} that contains the state necessary for resuming the execution.
-	 * Other than {@link #suspend(CoroutineStep, Object)} this suspension will
-	 * not contain an explicit input value. Such suspensions are used if the
-	 * input will only become available when the suspension ends (e.g. when
-	 * receiving data asynchronously).
+	 * Other than {@link #suspend(CoroutineStep, CoroutineStep, Object)} this
+	 * suspension will not contain an explicit input value. Such suspensions are
+	 * used if the input will only become available when the suspension ends
+	 * (e.g. when receiving data asynchronously).
 	 *
-	 * @param  rStep The step to suspend
+	 * @param  rSuspendingStep The step initiating the suspension
+	 * @param  rSuspendedStep  The step to suspend
 	 *
 	 * @return A new suspension object
 	 */
-	public <I> Suspension<I> suspend(CoroutineStep<I, ?> rStep)
+	public <I> Suspension<I> suspend(
+		CoroutineStep<?, I> rSuspendingStep,
+		CoroutineStep<I, ?> rSuspendedStep)
 	{
-		return suspend(rStep, null);
+		return suspend(rSuspendingStep, rSuspendedStep, null);
 	}
 
 	/***************************************
 	 * Suspends a step for later invocation and returns an instance of {@link
 	 * Suspension} that contains the state necessary for resuming the execution.
 	 * If the input value is not known before the suspension ends the method
-	 * {@link #suspend(CoroutineStep)} can be used instead.
+	 * {@link #suspend(CoroutineStep, CoroutineStep)} can be used instead.
 	 *
-	 * @param  rStep  The step to suspend
-	 * @param  rInput The input value for the execution
+	 * @param  rSuspendingStep The step initiating the suspension
+	 * @param  rSuspendedStep  The step to suspend
+	 * @param  rInput          The input value for the execution
 	 *
 	 * @return A new suspension object
 	 */
-	public <I> Suspension<I> suspend(CoroutineStep<I, ?> rStep, I rInput)
+	public <I> Suspension<I> suspend(CoroutineStep<?, I> rSuspendingStep,
+									 CoroutineStep<I, ?> rSuspendedStep,
+									 I					 rInput)
 	{
 		// only one suspension per continuation is possible
 		assert rCurrentSuspension == null;
 
-		Suspension<I> aSuspension = new Suspension<>(rInput, rStep, this);
+		Suspension<I> aSuspension =
+			new Suspension<>(rInput, rSuspendingStep, rSuspendedStep, this);
 
 		rScope.addSuspension(aSuspension);
 		rCurrentSuspension = aSuspension;
+
+		if (fSuspensionListener != null)
+		{
+			fSuspensionListener.accept(rCurrentSuspension, true);
+		}
 
 		return aSuspension;
 	}
@@ -535,13 +582,18 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 		if (!isCancelled())
 		{
+			if (fSuspensionListener != null)
+			{
+				fSuspensionListener.accept(rCurrentSuspension, false);
+			}
+
 			CompletableFuture<I> fResume =
 				CompletableFuture.supplyAsync(() -> rInput, this);
 
 			// the resume step is always either a StepChain which contains it's
 			// own next step or the final step in a coroutine and therefore
 			// rNextStep can be NULL
-			rSuspension.step().runAsync(fResume, null, this);
+			rSuspension.resumeStep().runAsync(fResume, null, this);
 		}
 
 		rCurrentSuspension = null;
@@ -571,6 +623,21 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
+	 * Traces the execution of coroutine steps (typically for debugging
+	 * purposes). Invokes the listener provided in the relation with the type
+	 * {@link Coroutines#COROUTINE_STEP_LISTENER} if it is not NULL.
+	 *
+	 * @param rStep The step to trace
+	 */
+	final void trace(CoroutineStep<?, ?> rStep)
+	{
+		if (fStepListener != null)
+		{
+			fStepListener.accept(rStep, this);
+		}
+	}
+
+	/***************************************
 	 * Notifies the coroutine listeners that are registered in the coroutine,
 	 * the scope, and the context.
 	 *
@@ -579,10 +646,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	private void notifyListeners(EventType eType)
 	{
 		Relatable[] rSources =
-			new Relatable[]
-			{
-				aCoroutineStack.peek(), rScope, rScope.context()
-			};
+			new Relatable[] { getCurrentCoroutine(), rScope, rScope.context() };
 
 		for (Relatable rSource : rSources)
 		{

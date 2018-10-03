@@ -141,7 +141,7 @@ public class Delay<T> extends CoroutineStep<T, T>
 						 CoroutineStep<T, ?>  rNextStep,
 						 Continuation<?>	  rContinuation)
 	{
-		Suspension<T> rSuspension = rContinuation.suspend(rNextStep);
+		Suspension<T> rSuspension = rContinuation.suspend(this, rNextStep);
 
 		fPreviousExecution.thenAcceptAsync(
 				  			t ->
