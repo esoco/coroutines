@@ -21,7 +21,6 @@ import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspending;
-import de.esoco.coroutine.Suspension;
 
 import de.esoco.lib.datatype.Pair;
 
@@ -138,14 +137,12 @@ public class Delay<T> extends CoroutineStep<T, T> implements Suspending
 	 * {@inheritDoc}
 	 */
 	@Override
-	public Suspension<T> runAsync(CompletableFuture<T> fPreviousExecution,
-								  CoroutineStep<T, ?>  rNextStep,
-								  Continuation<?>	   rContinuation)
+	public void runAsync(CompletableFuture<T> fPreviousExecution,
+						 CoroutineStep<T, ?>  rNextStep,
+						 Continuation<?>	  rContinuation)
 	{
-		Suspension<T> rSuspension = rContinuation.suspend(this, rNextStep);
-
 		fPreviousExecution.thenAcceptAsync(
-				  			t ->
+				  			v ->
 				  			{
 				  				Pair<Long, TimeUnit> rDuration =
 				  					getDuration(rContinuation);
@@ -154,17 +151,16 @@ public class Delay<T> extends CoroutineStep<T, T> implements Suspending
 				  				.getScheduler()
 				  				.schedule(
 				  					() ->
-				  						rSuspension.ifNotCancelled(
-				  							() ->
-				  								rSuspension.resume(t)),
+				  						rContinuation.suspend(
+				  							this,
+				  							rNextStep)
+				  						.resume(v),
 				  					rDuration.first(),
 				  					rDuration.second());
 				  			},
 				  			rContinuation)
 						  .exceptionally(t ->
 				  				rContinuation.fail(t));
-
-		return rSuspension;
 	}
 
 	/***************************************

@@ -20,7 +20,6 @@ import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
-import de.esoco.coroutine.Suspension;
 import de.esoco.coroutine.SuspensionGroup;
 
 import java.util.Collection;
@@ -95,17 +94,12 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public Suspension<O> runAsync(CompletableFuture<I> fPreviousExecution,
-								  CoroutineStep<O, ?>  rNextStep,
-								  Continuation<?>	   rContinuation)
+	public void runAsync(CompletableFuture<I> fPreviousExecution,
+						 CoroutineStep<O, ?>  rNextStep,
+						 Continuation<?>	  rContinuation)
 	{
-		SuspensionGroup<O> aSuspensionGroup =
-			rContinuation.suspendGroup(this, rNextStep);
-
 		fPreviousExecution.thenAcceptAsync(
-			i -> selectAsync(i, aSuspensionGroup));
-
-		return aSuspensionGroup;
+			i -> selectAsync(i, rContinuation.suspendGroup(this, rNextStep)));
 	}
 
 	/***************************************

@@ -85,14 +85,17 @@ public class Suspension<T>
 	{
 		aCancelLock.runLocked(() -> bCancelled = true);
 
-		if (rSuspensionGroup != null)
+		if (!bCancelled)
 		{
-			rSuspensionGroup.childCancelled(this);
-		}
+			if (rSuspensionGroup != null)
+			{
+				rSuspensionGroup.childCancelled(this);
+			}
 
-		if (!rContinuation.isCancelled())
-		{
-			rContinuation.cancel();
+			if (!rContinuation.isCancelled())
+			{
+				rContinuation.cancel();
+			}
 		}
 	}
 
@@ -190,16 +193,19 @@ public class Suspension<T>
 	 */
 	public void resume(T rValue)
 	{
-		this.rValue = rValue;
+		if (!bCancelled)
+		{
+			this.rValue = rValue;
 
-		if (rSuspensionGroup != null)
-		{
-			rSuspensionGroup.childResumed(this);
-			rContinuation.cancel();
-		}
-		else
-		{
-			rContinuation.resumeSuspension(this, rValue);
+			if (rSuspensionGroup != null)
+			{
+				rSuspensionGroup.childResumed(this);
+				rContinuation.cancel();
+			}
+			else
+			{
+				rContinuation.resumeSuspension(this, rValue);
+			}
 		}
 	}
 

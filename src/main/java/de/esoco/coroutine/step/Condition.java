@@ -19,7 +19,6 @@ package de.esoco.coroutine.step;
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineStep;
-import de.esoco.coroutine.Suspension;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -186,9 +185,9 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public Suspension<O> runAsync(CompletableFuture<I> fPreviousExecution,
-								  CoroutineStep<O, ?>  rNextStep,
-								  Continuation<?>	   rContinuation)
+	public void runAsync(CompletableFuture<I> fPreviousExecution,
+						 CoroutineStep<O, ?>  rNextStep,
+						 Continuation<?>	  rContinuation)
 	{
 		fPreviousExecution.thenAcceptAsync(
 			i ->
@@ -208,8 +207,6 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 				}
 			},
 			rContinuation);
-
-		return null;
 	}
 
 	/***************************************

@@ -19,7 +19,6 @@ package de.esoco.coroutine.step;
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineStep;
-import de.esoco.coroutine.Suspension;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
@@ -111,14 +110,12 @@ public class Loop<T> extends CoroutineStep<T, T>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public Suspension<T> runAsync(CompletableFuture<T> fPreviousExecution,
-								  CoroutineStep<T, ?>  rNextStep,
-								  Continuation<?>	   rContinuation)
+	public void runAsync(CompletableFuture<T> fPreviousExecution,
+						 CoroutineStep<T, ?>  rNextStep,
+						 Continuation<?>	  rContinuation)
 	{
 		fPreviousExecution.thenAcceptAsync(
 			i -> loopAsync(i, rNextStep, rContinuation));
-
-		return null;
 	}
 
 	/***************************************

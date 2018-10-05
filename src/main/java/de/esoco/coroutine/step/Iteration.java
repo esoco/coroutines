@@ -18,7 +18,6 @@ package de.esoco.coroutine.step;
 
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.CoroutineStep;
-import de.esoco.coroutine.Suspension;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -131,17 +130,15 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public Suspension<C> runAsync(CompletableFuture<I> fPreviousExecution,
-								  CoroutineStep<C, ?>  rNextStep,
-								  Continuation<?>	   rContinuation)
+	public void runAsync(CompletableFuture<I> fPreviousExecution,
+						 CoroutineStep<C, ?>  rNextStep,
+						 Continuation<?>	  rContinuation)
 	{
 		C aResults =
 			fCollectionFactory != null ? fCollectionFactory.get() : null;
 
 		fPreviousExecution.thenAcceptAsync(
 			i -> iterateAsync(i.iterator(), aResults, rNextStep, rContinuation));
-
-		return null;
 	}
 
 	/***************************************

@@ -84,20 +84,17 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 	 * Suspension#resume(Object)}.</p>
 	 *
 	 * <p>Subclasses that override this method also need to handle errors by
-	 * terminating any further execution (i.e. not resuming the suspension) and
-	 * forwarding the causing exception to {@link
+	 * terminating any further execution (i.e. not resuming a suspension if such
+	 * exists) and forwarding the causing exception to {@link
 	 * Continuation#fail(Throwable)}.</p>
 	 *
-	 * @param  fPreviousExecution The future of the previous code execution
-	 * @param  rNextStep          The next step to execute or NULL for none
-	 * @param  rContinuation      The continuation of the execution
-	 *
-	 * @return In the case of {@link Suspending} steps the suspension created or
-	 *         NULL otherwise
+	 * @param fPreviousExecution The future of the previous code execution
+	 * @param rNextStep          The next step to execute or NULL for none
+	 * @param rContinuation      The continuation of the execution
 	 */
-	public Suspension<O> runAsync(CompletableFuture<I> fPreviousExecution,
-								  CoroutineStep<O, ?>  rNextStep,
-								  Continuation<?>	   rContinuation)
+	public void runAsync(CompletableFuture<I> fPreviousExecution,
+						 CoroutineStep<O, ?>  rNextStep,
+						 Continuation<?>	  rContinuation)
 	{
 		CompletableFuture<O> fExecution =
 			fPreviousExecution.thenApplyAsync(
@@ -116,8 +113,6 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 			// only add exception handler to the end of a chain, i.e. next == null
 			fExecution.exceptionally(e -> fail(e, rContinuation));
 		}
-
-		return null;
 	}
 
 	/***************************************
