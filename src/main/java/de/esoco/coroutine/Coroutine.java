@@ -703,7 +703,7 @@ public class Coroutine<I, O> extends RelatedObject
 				// Chains need to be accessed as raw types because the
 				// intermediate type of the chain in rNextStep is unknown
 				aChainedInvocation.rNextStep =
-					((StepChain) rNextStep).then(rStep);
+					((StepChain) rNextStep).withLastStep(rStep);
 			}
 			else
 			{
