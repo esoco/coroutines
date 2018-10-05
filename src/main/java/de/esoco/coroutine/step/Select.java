@@ -22,19 +22,18 @@ import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.SuspensionGroup;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
-
-import static de.esoco.coroutine.Coroutines.SUSPENSION_GROUP;
+import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 
 
 /********************************************************************
- * A coroutine step that suspends the coroutine execution until one of multiple
- * suspendings steps resumes.
+ * A coroutine step that suspends the coroutine execution until one or more of
+ * several asynchronously executed coroutines resumes.
  *
  * @author eso
  */
@@ -42,50 +41,92 @@ public class Select<I, O> extends CoroutineStep<I, O>
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private Set<CoroutineStep<I, O>> aSteps = new LinkedHashSet<>();
+	private List<Coroutine<? super I, ? extends O>> aCoroutines =
+		new ArrayList<>();
 
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
 	 * Creates a new instance.
 	 *
-	 * @param rFromSteps The steps to select from
+	 * @param rFromCoroutines The coroutines to select from
 	 */
-	public Select(Collection<CoroutineStep<I, O>> rFromSteps)
+	public Select(Collection<Coroutine<? super I, ? extends O>> rFromCoroutines)
 	{
-		aSteps.addAll(rFromSteps);
+		if (rFromCoroutines.size() == 0)
+		{
+			throw new IllegalArgumentException(
+				"At least one coroutine to select required");
+		}
+
+		aCoroutines.addAll(rFromCoroutines);
 	}
 
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Suspends the coroutine execution until one of multiple suspendings steps
-	 * resumes.
+	 * Suspends the coroutine execution until one coroutine finishes.
 	 *
-	 * @param  rFromSteps The suspending steps to select from
+	 * @param  rFromCoroutines The coroutines to select from
 	 *
 	 * @return A new step instance
 	 */
 	@SafeVarargs
-	public static <I, O> Select<I, O> select(CoroutineStep<I, O>... rFromSteps)
+	public static <I, O> Select<I, O> select(
+		Coroutine<? super I, ? extends O>... rFromCoroutines)
 	{
-		return new Select<>(asList(rFromSteps));
+		return new Select<>(asList(rFromCoroutines));
+	}
+
+	/***************************************
+	 * Suspends the coroutine execution until one coroutine step finishes. The
+	 * step arguments will be wrapped into new coroutines.
+	 *
+	 * @param  rFromSteps The coroutine steps to select from
+	 *
+	 * @return A new step instance
+	 */
+	@SafeVarargs
+	public static <I, O> Select<I, O> select(
+		CoroutineStep<? super I, ? extends O>... rFromSteps)
+	{
+		return new Select<>(
+			asList(rFromSteps).stream()
+			.map(rStep -> new Coroutine<>(rStep))
+			.collect(Collectors.toList()));
 	}
 
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance that selects from an additional step.
+	 * Creates a new instance that selects from an additional coroutine.
+	 *
+	 * @param  rCoroutine The additional coroutine to select from
+	 *
+	 * @return The new instance
+	 */
+	public Select<I, O> or(Coroutine<? super I, ? extends O> rCoroutine)
+	{
+		Select<I, O> aSelect = new Select<>(aCoroutines);
+
+		aSelect.aCoroutines.add(rCoroutine);
+
+		return aSelect;
+	}
+
+	/***************************************
+	 * Creates a new instance that selects from an additional step. The step
+	 * will be wrapped into a new coroutine.
 	 *
 	 * @param  rStep The additional step to select from
 	 *
-	 * @return
+	 * @return The new instance
 	 */
-	public Select<I, O> or(CoroutineStep<I, O> rStep)
+	public Select<I, O> or(CoroutineStep<? super I, ? extends O> rStep)
 	{
-		Select<I, O> aSelect = new Select<>(aSteps);
+		Select<I, O> aSelect = new Select<>(aCoroutines);
 
-		aSelect.aSteps.add(rStep);
+		aSelect.aCoroutines.add(new Coroutine<>(rStep));
 
 		return aSelect;
 	}
@@ -103,7 +144,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	}
 
 	/***************************************
-	 * @see CoroutineStep#execute(Object, Continuation)
+	 * {@inheritDoc}
 	 */
 	@Override
 	protected O execute(I rInput, Continuation<?> rContinuation)
@@ -116,18 +157,24 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	/***************************************
 	 * Initiates the asynchronous selection.
 	 *
-	 * @param rInput           The input value
-	 * @param rSuspensionGroup The suspension group
+	 * @param rInput The input value
+	 * @param rGroup The suspension group
 	 */
-	void selectAsync(I rInput, SuspensionGroup<O> rSuspensionGroup)
+	void selectAsync(I rInput, SuspensionGroup<O> rGroup)
 	{
-		CoroutineScope rScope = rSuspensionGroup.continuation().scope();
+		CoroutineScope rScope = rGroup.continuation().scope();
 
-		for (CoroutineStep<I, O> rStep : aSteps)
-		{
-			rScope.async(
-				new Coroutine<>(rStep).with(SUSPENSION_GROUP, rSuspensionGroup),
-				rInput);
-		}
+		aCoroutines.forEach(
+			rCoroutine ->
+			{
+				Continuation<? extends O> rContinuation =
+					rScope.async(rCoroutine, rInput);
+
+				rGroup.add(rContinuation);
+
+				rContinuation.onFinish(rGroup::continuationFinished)
+				.onCancel(rGroup::continuationCancelled)
+				.onError(rGroup::continuationFailed);
+			});
 	}
 }

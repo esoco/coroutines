@@ -56,7 +56,7 @@ public class CoroutineTest
 {
 	//~ Static fields/initializers ---------------------------------------------
 
-	static Coroutine<String, Integer> PARSE_INT =
+	static Coroutine<String, Integer> CONVERT_INT =
 		Coroutine.first(apply((String s) -> s + 5))
 				 .then(apply(s -> s.replaceAll("\\D", "")))
 				 .then(apply(s -> Integer.valueOf(s)));
@@ -288,8 +288,8 @@ public class CoroutineTest
 		launch(
 			run ->
 			{
-				Continuation<Integer> ca = run.async(PARSE_INT, "test1234");
-				Continuation<Integer> cb = run.blocking(PARSE_INT, "test1234");
+				Continuation<Integer> ca = run.async(CONVERT_INT, "test1234");
+				Continuation<Integer> cb = run.blocking(CONVERT_INT, "test1234");
 
 				assertEquals(Integer.valueOf(12345), ca.getResult());
 				assertEquals(Integer.valueOf(12345), cb.getResult());

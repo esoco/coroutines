@@ -18,8 +18,6 @@ package de.esoco.coroutine;
 
 import de.esoco.lib.concurrent.RunLock;
 
-import static de.esoco.coroutine.Coroutines.SUSPENSION_GROUP;
-
 
 /********************************************************************
  * Encapsulates the data that represents a suspended {@link Coroutine}. The
@@ -36,7 +34,6 @@ public class Suspension<T>
 	private final CoroutineStep<?, T> rSuspendingStep;
 	private final CoroutineStep<T, ?> rResumeStep;
 	private final Continuation<?>     rContinuation;
-	private SuspensionGroup<?>		  rSuspensionGroup;
 
 	private boolean		  bCancelled  = false;
 	private final RunLock aCancelLock = new RunLock();
@@ -64,14 +61,6 @@ public class Suspension<T>
 		this.rSuspendingStep = rSuspendingStep;
 		this.rResumeStep     = rResumeStep;
 		this.rContinuation   = rContinuation;
-
-		rSuspensionGroup =
-			rContinuation.getCurrentCoroutine().get(SUSPENSION_GROUP);
-
-		if (rSuspensionGroup != null)
-		{
-			rSuspensionGroup.add(this);
-		}
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -85,17 +74,9 @@ public class Suspension<T>
 	{
 		aCancelLock.runLocked(() -> bCancelled = true);
 
-		if (!bCancelled)
+		if (!rContinuation.isCancelled())
 		{
-			if (rSuspensionGroup != null)
-			{
-				rSuspensionGroup.childCancelled(this);
-			}
-
-			if (!rContinuation.isCancelled())
-			{
-				rContinuation.cancel();
-			}
+			rContinuation.cancel();
 		}
 	}
 
@@ -118,11 +99,6 @@ public class Suspension<T>
 	 */
 	public void fail(Throwable eError)
 	{
-		if (rSuspensionGroup != null)
-		{
-			rSuspensionGroup.childFailed(this, eError);
-		}
-
 		rContinuation.fail(eError);
 	}
 
@@ -196,16 +172,7 @@ public class Suspension<T>
 		if (!bCancelled)
 		{
 			this.rValue = rValue;
-
-			if (rSuspensionGroup != null)
-			{
-				rSuspensionGroup.childResumed(this);
-				rContinuation.cancel();
-			}
-			else
-			{
-				rContinuation.resumeSuspension(this, rValue);
-			}
+			rContinuation.resumeSuspension(this, rValue);
 		}
 	}
 

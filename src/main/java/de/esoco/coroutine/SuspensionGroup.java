@@ -22,11 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 
 /********************************************************************
- * A {@link Suspension} subclass that contains other suspensions and resumes
- * execution depending on the state of it's children. The generic type of the
- * child suspensions must be the same as that of the group. Because no
- * declarative type coupling is possible this must be enforced by the code that
- * operated on the group and it's children.
+ * A {@link Suspension} subclass that groups multiple continuations and resumes
+ * execution depending on their state.
  *
  * @author eso
  */
@@ -36,23 +33,42 @@ public class SuspensionGroup<T> extends Suspension<T>
 
 	private final AtomicBoolean aCompleteFlag = new AtomicBoolean(false);
 
-	private final List<Suspension<?>> aChildren = new ArrayList<>();
+	private final List<Continuation<? extends T>> aContinuations =
+		new ArrayList<>();
 
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance.
+	 * Creates a new instance. Internal, creation through {@link
+	 * Continuation#suspendGroup(CoroutineStep, CoroutineStep)}.
 	 *
 	 * @see Suspension#Suspension(CoroutineStep, CoroutineStep, Continuation)
 	 */
-	protected SuspensionGroup(CoroutineStep<?, T> rSuspendingStep,
-							  CoroutineStep<T, ?> rResumeStep,
-							  Continuation<?>	  rContinuation)
+	SuspensionGroup(CoroutineStep<?, T> rSuspendingStep,
+					CoroutineStep<T, ?> rResumeStep,
+					Continuation<?>		rContinuation)
 	{
 		super(rSuspendingStep, rResumeStep, rContinuation);
 	}
 
 	//~ Methods ----------------------------------------------------------------
+
+	/***************************************
+	 * Adds a child suspension to this group.
+	 *
+	 * @param rContinuation The child suspension
+	 */
+	public void add(Continuation<? extends T> rContinuation)
+	{
+		if (!aCompleteFlag.get())
+		{
+			aContinuations.add(rContinuation);
+		}
+		else
+		{
+			rContinuation.cancel();
+		}
+	}
 
 	/***************************************
 	 * {@inheritDoc}
@@ -66,6 +82,52 @@ public class SuspensionGroup<T> extends Suspension<T>
 		}
 
 		super.cancel();
+	}
+
+	/***************************************
+	 * Notification from a child suspension when it is cancelled.
+	 *
+	 * @param rContinuation The cancelled continuation
+	 */
+	public void continuationCancelled(Continuation<? extends T> rContinuation)
+	{
+		if (!aCompleteFlag.getAndSet(true))
+		{
+			aContinuations.remove(rContinuation);
+			cancelRemaining();
+			cancel();
+		}
+	}
+
+	/***************************************
+	 * Notification from a child suspension when it failed.
+	 *
+	 * @param rContinuation The failed {@link Continuation}
+	 */
+	public void continuationFailed(Continuation<? extends T> rContinuation)
+	{
+		if (!aCompleteFlag.getAndSet(true))
+		{
+			aContinuations.remove(rContinuation);
+			cancelRemaining();
+			fail(rContinuation.getError());
+		}
+	}
+
+	/***************************************
+	 * Notification from a child suspension when it is resumed.
+	 *
+	 * @param rContinuation The finished continuation
+	 */
+	@SuppressWarnings("unchecked")
+	public void continuationFinished(Continuation<? extends T> rContinuation)
+	{
+		if (!aCompleteFlag.getAndSet(true))
+		{
+			aContinuations.remove(rContinuation);
+			cancelRemaining();
+			resume(rContinuation.getResult());
+		}
 	}
 
 	/***************************************
@@ -97,80 +159,16 @@ public class SuspensionGroup<T> extends Suspension<T>
 	}
 
 	/***************************************
-	 * Adds a child suspension to this group.
-	 *
-	 * @param rChild The child suspension
-	 */
-	void add(Suspension<?> rChild)
-	{
-		if (!aCompleteFlag.get())
-		{
-			aChildren.add(rChild);
-		}
-		else
-		{
-			rChild.cancel();
-		}
-	}
-
-	/***************************************
-	 * Notification from a child suspension when it is cancelled.
-	 *
-	 * @param rChild The cancelled child suspension
-	 */
-	void childCancelled(Suspension<?> rChild)
-	{
-		if (!aCompleteFlag.getAndSet(true))
-		{
-			aChildren.remove(rChild);
-			cancelRemaining();
-			cancel();
-		}
-	}
-
-	/***************************************
-	 * Notification from a child suspension when it failed.
-	 *
-	 * @param rChild The failed child suspension
-	 * @param eError The error exception
-	 */
-	void childFailed(Suspension<?> rChild, Throwable eError)
-	{
-		if (!aCompleteFlag.getAndSet(true))
-		{
-			aChildren.remove(rChild);
-			cancelRemaining();
-			fail(eError);
-		}
-	}
-
-	/***************************************
-	 * Notification from a child suspension when it is resumed.
-	 *
-	 * @param rChild The resumed child suspension
-	 */
-	@SuppressWarnings("unchecked")
-	void childResumed(Suspension<?> rChild)
-	{
-		if (!aCompleteFlag.getAndSet(true))
-		{
-			aChildren.remove(rChild);
-			cancelRemaining();
-			resume((T) rChild.value());
-		}
-	}
-
-	/***************************************
 	 * Cancels all remaining child suspensions with the exception of the
 	 * argument child.
 	 */
 	private void cancelRemaining()
 	{
-		for (Suspension<?> rSuspension : aChildren)
+		for (Continuation<? extends T> rContinuation : aContinuations)
 		{
-			rSuspension.cancel();
+			rContinuation.cancel();
 		}
 
-		aChildren.clear();
+		aContinuations.clear();
 	}
 }

@@ -47,7 +47,7 @@ public class SubroutineTest
 	public void testSubroutine()
 	{
 		Coroutine<String, Integer> cr =
-			Coroutine.first(call(CoroutineTest.PARSE_INT))
+			Coroutine.first(call(CoroutineTest.CONVERT_INT))
 					 .then(apply(i -> i + 10));
 
 		launch(

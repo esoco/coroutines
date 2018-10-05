@@ -31,7 +31,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 import org.obrel.core.Relatable;
 import org.obrel.core.RelatedObject;
@@ -79,7 +78,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 	private Throwable     eError			 = null;
 	private Suspension<?> rCurrentSuspension = null;
 
-	private Function<T, ?> fRunWhenDone;
+	private Consumer<Continuation<T>> fRunWhenDone;
+	private Consumer<Continuation<T>> fRunOnCancel;
+	private Consumer<Continuation<T>> fRunOnError;
 
 	private Deque<Coroutine<?, ?>> aCoroutineStack = new ArrayDeque<>();
 	private final CountDownLatch   aFinishSignal   = new CountDownLatch(1);
@@ -141,6 +142,11 @@ public class Continuation<T> extends RelatedObject implements Executor
 			{
 				bCancelled = true;
 				finish(null);
+
+				if (fRunOnCancel != null)
+				{
+					fRunOnCancel.accept(this);
+				}
 			}
 		});
 
@@ -210,6 +216,11 @@ public class Continuation<T> extends RelatedObject implements Executor
 			cancel();
 
 			getConfiguration(EXCEPTION_HANDLER, null).accept(eError);
+
+			if (fRunOnError != null)
+			{
+				fRunOnError.accept(this);
+			}
 		}
 
 		return null;
@@ -435,6 +446,87 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
+	 * Sets a function to be run if the execution of this instance is cancelled.
+	 *
+	 * @param  fRunOnCancel A function to be run on cancellation
+	 *
+	 * @return This instance to allow additional invocations
+	 */
+	public Continuation<T> onCancel(Consumer<Continuation<T>> fRunOnCancel)
+	{
+		// ensure that function is not set while cancel is in progress
+		aStateLock.runLocked(
+			() ->
+		{
+			if (bCancelled && eError == null)
+			{
+				fRunOnCancel.accept(this);
+			}
+			else
+			{
+				this.fRunOnCancel = fRunOnCancel;
+			}
+		});
+
+		return this;
+	}
+
+	/***************************************
+	 * Sets a function to be run if the execution of this instance fails.
+	 *
+	 * @param  fRunOnError A function to be run on cancellation
+	 *
+	 * @return This instance to allow additional invocations
+	 */
+	public Continuation<T> onError(Consumer<Continuation<T>> fRunOnError)
+	{
+		// ensure that function is not set while cancel is in progress
+		aStateLock.runLocked(
+			() ->
+		{
+			if (bCancelled && eError != null)
+			{
+				fRunOnError.accept(this);
+			}
+			else
+			{
+				this.fRunOnError = fRunOnError;
+			}
+		});
+
+		return this;
+	}
+
+	/***************************************
+	 * Sets a function that will be invoked after the coroutine has successfully
+	 * finished execution and {@link #finish(Object)} has been invoked. If the
+	 * execution of the coroutine is cancelled (by invoking {@link #cancel()})
+	 * the code will not be invoked. The code will be run directly, not
+	 * asynchronously.
+	 *
+	 * @param  fRunWhenDone The consumer to process this continuation with when
+	 *                      the execution has finished
+	 *
+	 * @return This instance to allow additional invocations
+	 */
+	public Continuation<T> onFinish(Consumer<Continuation<T>> fRunWhenDone)
+	{
+		// ensure that function is not set while finishing is in progress
+		aStateLock.runLocked(
+			() ->
+			{
+				this.fRunWhenDone = fRunWhenDone;
+
+				if (bFinished && !bCancelled)
+				{
+					fRunWhenDone.accept(this);
+				}
+			});
+
+		return this;
+	}
+
+	/***************************************
 	 * Returns the scope in which the coroutine is executed.
 	 *
 	 * @return The coroutine scope
@@ -494,39 +586,16 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
-	 * Sets a function that will be invoked after the coroutine has successfully
-	 * finished execution and {@link #finish(Object)} has been invoked. The
-	 * given code will always be run asynchronously after the execution has
-	 * finished. If the execution of the coroutine is cancelled (by invoking
-	 * {@link #cancel()}) the code will not be invoked.
-	 *
-	 * @param  fRunWhenDone The function to apply when the execution has
-	 *                      finished
-	 *
-	 * @return This instance to allow further invocations like {@link
-	 *         #getResult()} or {@link #await()}
+	 * {@inheritDoc}
 	 */
-	public Continuation<T> then(Function<T, ?> fRunWhenDone)
+	@Override
+	public String toString()
 	{
-		// lock ensures that fRunWhenDone is not set while finishing is in progress
-		aStateLock.runLocked(
-			() ->
-		{
-			if (bFinished)
-			{
-				if (!bCancelled)
-				{
-					CompletableFuture.runAsync(
-						() -> fRunWhenDone.apply(getResult()));
-				}
-			}
-			else
-			{
-				this.fRunWhenDone = fRunWhenDone;
-			}
-		});
-
-		return this;
+		return String.format(
+			"%s-%d[%s]",
+			getClass().getSimpleName(),
+			nId,
+			rResult);
 	}
 
 	/***************************************
@@ -537,6 +606,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 */
 	void finish(T rResult)
 	{
+		assert !bFinished;
 		assert aCoroutineStack.size() == 1;
 
 		try
@@ -548,13 +618,13 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 			aFinishSignal.countDown();
 
-			if (!bCancelled && fRunWhenDone != null)
-			{
-				CompletableFuture.runAsync(() -> fRunWhenDone.apply(rResult));
-			}
-
 			rScope.coroutineFinished(this);
 			notifyListeners(EventType.FINISHED);
+
+			if (!bCancelled && fRunWhenDone != null)
+			{
+				fRunWhenDone.accept(this);
+			}
 		}
 		finally
 		{

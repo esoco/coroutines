@@ -44,7 +44,8 @@ public class SelectTest
 
 	private static final Coroutine<Void, String> SELECT_ABC =
 		Coroutine.first(
-			select(receive(CHANNEL_A), receive(CHANNEL_B), receive(CHANNEL_C)));
+			select(receive(CHANNEL_A)).or(receive(CHANNEL_B))
+			.or(receive(CHANNEL_C)));
 
 	//~ Static methods ---------------------------------------------------------
 
@@ -66,26 +67,40 @@ public class SelectTest
 	@Test
 	public void testChannelSelect()
 	{
-		testSelect(CHANNEL_A);
-		testSelect(CHANNEL_B);
-		testSelect(CHANNEL_C);
+		testSelect(CHANNEL_A, true);
+		testSelect(CHANNEL_B, true);
+		testSelect(CHANNEL_C, true);
+		testSelect(CHANNEL_A, false);
+		testSelect(CHANNEL_B, false);
+		testSelect(CHANNEL_C, false);
 	}
 
 	/***************************************
 	 * Test selecting a certain channel.
 	 *
-	 * @param rId The channel ID
+	 * @param rId    The channel ID
+	 * @param bAsync Async or blocking
 	 */
-	private void testSelect(ChannelId<String> rId)
+	private void testSelect(ChannelId<String> rId, boolean bAsync)
 	{
 		launch(
 			run ->
 			{
-				Continuation<String> c = run.async(SELECT_ABC);
-
 				Channel<String> channel = run.context().getChannel(rId);
 
-				channel.sendBlocking("TEST-" + rId);
+				// send first if blocking or else scope will be blocked...
+				if (!bAsync)
+				{
+					channel.sendBlocking("TEST-" + rId);
+				}
+
+				Continuation<String> c =
+					bAsync ? run.async(SELECT_ABC) : run.blocking(SELECT_ABC);
+
+				if (bAsync)
+				{
+					channel.sendBlocking("TEST-" + rId);
+				}
 
 				assertEquals("TEST-" + rId, c.getResult());
 				assertTrue(c.isFinished());

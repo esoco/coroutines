@@ -367,6 +367,18 @@ public class CoroutineScope extends CoroutineEnvironment
 	}
 
 	/***************************************
+	 * {@inheritDoc}
+	 */
+	@Override
+	public String toString()
+	{
+		return String.format(
+			"%s[%d]",
+			getClass().getSimpleName(),
+			nRunningCoroutines);
+	}
+
+	/***************************************
 	 * Adds a suspension of a coroutine in this scope.
 	 *
 	 * @param rSuspension The suspension to add
