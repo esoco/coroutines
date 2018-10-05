@@ -16,7 +16,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine.step.nio;
 
-import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspension;
 
@@ -152,18 +151,8 @@ public abstract class AsynchronousChannelStep
 			}
 			catch (Exception e)
 			{
-				rSuspension.continuation().fail(e);
+				rSuspension.fail(e);
 			}
-		}
-
-		/***************************************
-		 * Returns the continuation of this callback.
-		 *
-		 * @return The continuation
-		 */
-		public Continuation<?> continuation()
-		{
-			return rSuspension.continuation();
 		}
 
 		/***************************************
@@ -172,7 +161,7 @@ public abstract class AsynchronousChannelStep
 		@Override
 		public void failed(Throwable eError, ByteBuffer rData)
 		{
-			rSuspension.continuation().fail(eError);
+			rSuspension.fail(eError);
 		}
 	}
 }

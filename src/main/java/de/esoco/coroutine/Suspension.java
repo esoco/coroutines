@@ -18,6 +18,8 @@ package de.esoco.coroutine;
 
 import de.esoco.lib.concurrent.RunLock;
 
+import static de.esoco.coroutine.Coroutines.SUSPENSION_GROUP;
+
 
 /********************************************************************
  * Encapsulates the data that represents a suspended {@link Coroutine}. The
@@ -29,11 +31,12 @@ public class Suspension<T>
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private T rInput;
+	private T rValue;
 
 	private final CoroutineStep<?, T> rSuspendingStep;
 	private final CoroutineStep<T, ?> rResumeStep;
 	private final Continuation<?>     rContinuation;
+	private SuspensionGroup<?>		  rSuspensionGroup;
 
 	private boolean		  bCancelled  = false;
 	private final RunLock aCancelLock = new RunLock();
@@ -47,20 +50,28 @@ public class Suspension<T>
 	 * (e.g. when receiving data). To resume execution with an explicit input
 	 * value the method {@link #resume(Object)} can be used. If the resume
 	 * should occur at a different time than the availability of the input value
-	 * a suspension can be updated by calling {@link #withInput(Object)}. In
+	 * a suspension can be updated by calling {@link #withValue(Object)}. In
 	 * that case {@link #resume()} can be used later to resume the execution.
 	 *
 	 * @param rSuspendingStep The step that initiated the suspension
 	 * @param rResumeStep     The step to resume the execution with
 	 * @param rContinuation   The continuation of the execution
 	 */
-	public Suspension(CoroutineStep<?, T> rSuspendingStep,
-					  CoroutineStep<T, ?> rResumeStep,
-					  Continuation<?>	  rContinuation)
+	protected Suspension(CoroutineStep<?, T> rSuspendingStep,
+						 CoroutineStep<T, ?> rResumeStep,
+						 Continuation<?>	 rContinuation)
 	{
 		this.rSuspendingStep = rSuspendingStep;
 		this.rResumeStep     = rResumeStep;
 		this.rContinuation   = rContinuation;
+
+		rSuspensionGroup =
+			rContinuation.getCurrentCoroutine().get(SUSPENSION_GROUP);
+
+		if (rSuspensionGroup != null)
+		{
+			rSuspensionGroup.add(this);
+		}
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -73,6 +84,11 @@ public class Suspension<T>
 	public void cancel()
 	{
 		aCancelLock.runLocked(() -> bCancelled = true);
+
+		if (rSuspensionGroup != null)
+		{
+			rSuspensionGroup.childCancelled(this);
+		}
 
 		if (!rContinuation.isCancelled())
 		{
@@ -95,11 +111,36 @@ public class Suspension<T>
 	 * Continuation#fail(Throwable) fail} the continuation. Tries to resume a
 	 * failed suspension will be ignored.
 	 *
-	 * @param e The error exception
+	 * @param eError The error exception
 	 */
-	public void fail(Throwable e)
+	public void fail(Throwable eError)
 	{
-		rContinuation.fail(e);
+		if (rSuspensionGroup != null)
+		{
+			rSuspensionGroup.childFailed(this, eError);
+		}
+
+		rContinuation.fail(eError);
+	}
+
+	/***************************************
+	 * Returns the step to be execute when resuming.
+	 *
+	 * @return The resume step
+	 */
+	public final CoroutineStep<T, ?> getResumeStep()
+	{
+		return rResumeStep;
+	}
+
+	/***************************************
+	 * Returns the step that initiated this suspension.
+	 *
+	 * @return The suspending step
+	 */
+	public final CoroutineStep<?, T> getSuspendingStep()
+	{
+		return rSuspendingStep;
 	}
 
 	/***************************************
@@ -122,16 +163,6 @@ public class Suspension<T>
 	}
 
 	/***************************************
-	 * Returns the input value.
-	 *
-	 * @return The input
-	 */
-	public final T input()
-	{
-		return rInput;
-	}
-
-	/***************************************
 	 * Checks if the this suspension has been cancelled.
 	 *
 	 * @return TRUE if the suspension has been cancelled
@@ -149,51 +180,64 @@ public class Suspension<T>
 	 */
 	public final void resume()
 	{
-		resume(rInput);
+		resume(rValue);
 	}
 
 	/***************************************
-	 * Resumes the execution of the suspended coroutine with the given input
-	 * value.
+	 * Resumes the execution of the suspended coroutine with the given value.
 	 *
-	 * @param rStepInput The input value to the step
+	 * @param rValue The input value to the resumed step
 	 */
-	public void resume(T rStepInput)
+	public void resume(T rValue)
 	{
-		rContinuation.resumeSuspension(this, rStepInput);
+		this.rValue = rValue;
+
+		if (rSuspensionGroup != null)
+		{
+			rSuspensionGroup.childResumed(this);
+			rContinuation.cancel();
+		}
+		else
+		{
+			rContinuation.resumeSuspension(this, rValue);
+		}
 	}
 
 	/***************************************
-	 * Returns the step to be execute when resuming.
-	 *
-	 * @return The resume step
+	 * {@inheritDoc}
 	 */
-	public final CoroutineStep<T, ?> resumeStep()
+	@Override
+	public String toString()
 	{
-		return rResumeStep;
+		return String.format(
+			"%s[%s -> %s]",
+			getClass().getSimpleName(),
+			rSuspendingStep,
+			rResumeStep);
 	}
 
 	/***************************************
-	 * Returns the step that initiated this suspension.
+	 * Returns the value of this suspension. The value will be used as the input
+	 * of the resumed step.
 	 *
-	 * @return The suspending step
+	 * @return The suspension value
 	 */
-	public final CoroutineStep<?, T> suspendingStep()
+	public final T value()
 	{
-		return rSuspendingStep;
+		return rValue;
 	}
 
 	/***************************************
-	 * Sets the input value and returns this instance so that it can be used as
-	 * an updated argument to method calls.
+	 * Sets the suspension value and returns this instance so that it can be
+	 * used as an updated argument to method calls.
 	 *
-	 * @param  rInput The new input value
+	 * @param  rValue The new value
 	 *
 	 * @return This instance
 	 */
-	public Suspension<T> withInput(T rInput)
+	public Suspension<T> withValue(T rValue)
 	{
-		this.rInput = rInput;
+		this.rValue = rValue;
 
 		return this;
 	}

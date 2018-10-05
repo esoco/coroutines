@@ -245,7 +245,7 @@ public class Channel<T> implements AutoCloseable
 			{
 				checkClosed();
 
-				if (aChannelData.offer(rSuspension.input()))
+				if (aChannelData.offer(rSuspension.value()))
 				{
 					rSuspension.resume();
 					resumeReceivers();
@@ -269,6 +269,15 @@ public class Channel<T> implements AutoCloseable
 	public int size()
 	{
 		return aChannelData.size();
+	}
+
+	/***************************************
+	 * {@inheritDoc}
+	 */
+	@Override
+	public String toString()
+	{
+		return String.format("%s-%s", getClass().getSimpleName(), rId);
 	}
 
 	/***************************************
@@ -310,7 +319,7 @@ public class Channel<T> implements AutoCloseable
 			rSuspension.ifNotCancelled(
 				() ->
 			{
-				if (aChannelData.offer(rSuspension.input()))
+				if (aChannelData.offer(rSuspension.value()))
 				{
 					rSuspension.resume();
 				}

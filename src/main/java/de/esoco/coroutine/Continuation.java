@@ -445,12 +445,12 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
-	 * Suspends a step for later invocation and returns an instance of {@link
-	 * Suspension} that contains the state necessary for resuming the execution.
-	 * The suspension will not contain an input value because it is typically
-	 * not know upon suspendsion. It must be provided later, either when
-	 * resuming with {@link Suspension#resume(Object)} or by setting it into the
-	 * suspension with {@link Suspension#withInput(Object)}.
+	 * Suspends an invoking step for later invocation. Returns an instance of
+	 * {@link Suspension} that contains the state necessary for resuming the
+	 * execution. The suspension will not contain an input value because it is
+	 * typically not know upon suspension. It must be provided later, either
+	 * when resuming with {@link Suspension#resume(Object)} or by setting it
+	 * into the suspension with {@link Suspension#withValue(Object)}.
 	 *
 	 * @param  rSuspendingStep The step initiating the suspension
 	 * @param  rSuspendedStep  The step to suspend
@@ -461,21 +461,36 @@ public class Continuation<T> extends RelatedObject implements Executor
 		CoroutineStep<?, V> rSuspendingStep,
 		CoroutineStep<V, ?> rSuspendedStep)
 	{
-		// only one suspension per continuation is possible
-		assert rCurrentSuspension == null;
-
 		Suspension<V> aSuspension =
 			new Suspension<>(rSuspendingStep, rSuspendedStep, this);
 
-		rScope.addSuspension(aSuspension);
-		rCurrentSuspension = aSuspension;
-
-		if (fSuspensionListener != null)
-		{
-			fSuspensionListener.accept(rCurrentSuspension, true);
-		}
+		suspendTo(aSuspension);
 
 		return aSuspension;
+	}
+
+	/***************************************
+	 * Suspends an invoking step to group other suspensions that have been
+	 * created with {@link #suspend(CoroutineStep, CoroutineStep)}. Returns an
+	 * instance of {@link SuspensionGroup} that manages the grouped suspensions
+	 * and resumes the current step depending on the state of the child
+	 * suspensions.
+	 *
+	 * @param  rSuspendingStep The step initiating the suspension
+	 * @param  rSuspendedStep  The step to suspend
+	 *
+	 * @return A new suspension object
+	 */
+	public <V> SuspensionGroup<V> suspendGroup(
+		CoroutineStep<?, V> rSuspendingStep,
+		CoroutineStep<V, ?> rSuspendedStep)
+	{
+		SuspensionGroup<V> aSuspensionGroup =
+			new SuspensionGroup<>(rSuspendingStep, rSuspendedStep, this);
+
+		suspendTo(aSuspensionGroup);
+
+		return aSuspensionGroup;
 	}
 
 	/***************************************
@@ -574,7 +589,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 			// the resume step is always either a StepChain which contains it's
 			// own next step or the final step in a coroutine and therefore
 			// rNextStep can be NULL
-			rSuspension.resumeStep().runAsync(fResume, null, this);
+			rSuspension.getResumeStep().runAsync(fResume, null, this);
 		}
 
 		rCurrentSuspension = null;
@@ -601,6 +616,26 @@ public class Continuation<T> extends RelatedObject implements Executor
 	void subroutineStarted(Subroutine<?, ?, ?> rSubroutine)
 	{
 		aCoroutineStack.push(rSubroutine);
+	}
+
+	/***************************************
+	 * Internal implementation of suspension with {@link #suspend(CoroutineStep,
+	 * CoroutineStep)} and {@link #suspendGroup(CoroutineStep, CoroutineStep)}.
+	 *
+	 * @param rSuspension The suspension to suspend to
+	 */
+	void suspendTo(Suspension<?> rSuspension)
+	{
+		// only one suspension per continuation is possible
+		assert rCurrentSuspension == null;
+
+		rScope.addSuspension(rSuspension);
+		rCurrentSuspension = rSuspension;
+
+		if (fSuspensionListener != null)
+		{
+			fSuspensionListener.accept(rCurrentSuspension, true);
+		}
 	}
 
 	/***************************************

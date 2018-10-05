@@ -82,6 +82,13 @@ public class Coroutines
 												Continuation<?>>> COROUTINE_STEP_LISTENER =
 		newType();
 
+	/**
+	 * State: a group of suspensions. Used by steps that manage multiple
+	 * suspending steps.
+	 */
+	public static final RelationType<SuspensionGroup<?>> SUSPENSION_GROUP =
+		newType();
+
 	static
 	{
 		RelationTypes.init(Coroutines.class);

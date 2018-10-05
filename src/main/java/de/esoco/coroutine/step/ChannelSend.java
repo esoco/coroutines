@@ -109,7 +109,7 @@ public class ChannelSend<T> extends ChannelStep<T, T>
 		fPreviousExecution.thenAcceptAsync(
 				  			v ->
 				  				getChannel(rContinuation).sendSuspending(
-				  					rSuspension.withInput(v)),
+				  					rSuspension.withValue(v)),
 				  			rContinuation)
 						  .exceptionally(t ->
 				  				rContinuation.fail(t));

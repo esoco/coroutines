@@ -261,7 +261,7 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 		}
 		catch (Exception e)
 		{
-			rSuspension.continuation().fail(e);
+			rSuspension.fail(e);
 		}
 	}
 }

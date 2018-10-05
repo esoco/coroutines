@@ -17,14 +17,18 @@
 package de.esoco.coroutine.step;
 
 import de.esoco.coroutine.Continuation;
+import de.esoco.coroutine.Coroutine;
+import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
-import de.esoco.coroutine.Suspending;
 import de.esoco.coroutine.Suspension;
+import de.esoco.coroutine.SuspensionGroup;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+
+import static de.esoco.coroutine.Coroutines.SUSPENSION_GROUP;
 
 import static java.util.Arrays.asList;
 
@@ -35,12 +39,11 @@ import static java.util.Arrays.asList;
  *
  * @author eso
  */
-public class Select<I, O, S extends CoroutineStep<I, O> & Suspending>
-	extends CoroutineStep<I, O>
+public class Select<I, O> extends CoroutineStep<I, O>
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private Set<S> aSteps = new LinkedHashSet<>();
+	private Set<CoroutineStep<I, O>> aSteps = new LinkedHashSet<>();
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -49,7 +52,7 @@ public class Select<I, O, S extends CoroutineStep<I, O> & Suspending>
 	 *
 	 * @param rFromSteps The steps to select from
 	 */
-	public Select(Collection<S> rFromSteps)
+	public Select(Collection<CoroutineStep<I, O>> rFromSteps)
 	{
 		aSteps.addAll(rFromSteps);
 	}
@@ -60,17 +63,33 @@ public class Select<I, O, S extends CoroutineStep<I, O> & Suspending>
 	 * Suspends the coroutine execution until one of multiple suspendings steps
 	 * resumes.
 	 *
-	 * @param  rFromStep The first suspending step to select from
+	 * @param  rFromSteps The suspending steps to select from
 	 *
 	 * @return A new step instance
 	 */
-	public static <I, O, S extends CoroutineStep<I, O> & Suspending> Select<I, O, S>
-	select(S rFromStep)
+	@SafeVarargs
+	public static <I, O> Select<I, O> select(CoroutineStep<I, O>... rFromSteps)
 	{
-		return new Select<>(asList(rFromStep));
+		return new Select<>(asList(rFromSteps));
 	}
 
 	//~ Methods ----------------------------------------------------------------
+
+	/***************************************
+	 * Creates a new instance that selects from an additional step.
+	 *
+	 * @param  rStep The additional step to select from
+	 *
+	 * @return
+	 */
+	public Select<I, O> or(CoroutineStep<I, O> rStep)
+	{
+		Select<I, O> aSelect = new Select<>(aSteps);
+
+		aSelect.aSteps.add(rStep);
+
+		return aSelect;
+	}
 
 	/***************************************
 	 * {@inheritDoc}
@@ -80,59 +99,41 @@ public class Select<I, O, S extends CoroutineStep<I, O> & Suspending>
 								  CoroutineStep<O, ?>  rNextStep,
 								  Continuation<?>	   rContinuation)
 	{
-		SuspensionGroup<O> aSuspension =
-			new SuspensionGroup<>(this, rNextStep, rContinuation);
+		SuspensionGroup<O> aSuspensionGroup =
+			rContinuation.suspendGroup(this, rNextStep);
 
-		return aSuspension;
+		fPreviousExecution.thenAcceptAsync(
+			i -> selectAsync(i, aSuspensionGroup));
+
+		return aSuspensionGroup;
 	}
 
 	/***************************************
-	 * Always throws an exception because selecting always requires the parallel
-	 * and non-blocking execution of the steps to select from. This could be
-	 * achieved
-	 *
 	 * @see CoroutineStep#execute(Object, Continuation)
 	 */
 	@Override
 	protected O execute(I rInput, Continuation<?> rContinuation)
 	{
-//		CoroutineScope.launch(
-//			rContinuation.context(),
-//			run ->
-//		{
-//			for (S rStep : aSteps)
-//			{
-//				run.async(Coroutine.first(rStep), rInput);
-//			}
-//		});
-
-		throw new UnsupportedOperationException(
-			"Select can only be executed asynchronously");
+		return rContinuation.scope()
+							.async(new Coroutine<>(this), rInput)
+							.getResult();
 	}
 
-	//~ Inner Classes ----------------------------------------------------------
-
-	/********************************************************************
-	 * TODO: DOCUMENT ME!
+	/***************************************
+	 * Initiates the asynchronous selection.
 	 *
-	 * @author eso
+	 * @param rInput           The input value
+	 * @param rSuspensionGroup The suspension group
 	 */
-	static class SuspensionGroup<T> extends Suspension<T>
+	void selectAsync(I rInput, SuspensionGroup<O> rSuspensionGroup)
 	{
-		//~ Constructors -------------------------------------------------------
+		CoroutineScope rScope = rSuspensionGroup.continuation().scope();
 
-		/***************************************
-		 * Creates a new instance.
-		 *
-		 * @param rSuspendingStep TODO: DOCUMENT ME!
-		 * @param rResumeStep     TODO: DOCUMENT ME!
-		 * @param rContinuation   TODO: DOCUMENT ME!
-		 */
-		public SuspensionGroup(CoroutineStep<?, T> rSuspendingStep,
-							   CoroutineStep<T, ?> rResumeStep,
-							   Continuation<?>	   rContinuation)
+		for (CoroutineStep<I, O> rStep : aSteps)
 		{
-			super(rSuspendingStep, rResumeStep, rContinuation);
+			rScope.async(
+				new Coroutine<>(rStep).with(SUSPENSION_GROUP, rSuspensionGroup),
+				rInput);
 		}
 	}
 }

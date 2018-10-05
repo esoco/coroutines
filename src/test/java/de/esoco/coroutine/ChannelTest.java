@@ -25,6 +25,7 @@ import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.step.ChannelReceive.receive;
 import static de.esoco.coroutine.step.ChannelSend.send;
 import static de.esoco.coroutine.step.CodeExecution.apply;
+import static de.esoco.coroutine.step.Select.select;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -54,6 +55,14 @@ public class ChannelTest
 		Coroutine.first(receive(TEST_CHANNEL))
 				 .with(NAME, "Receive")
 				 .then(apply(s -> s.toUpperCase()));
+
+	private static final ChannelId<String> CHANNEL_A = stringChannel("A");
+	private static final ChannelId<String> CHANNEL_B = stringChannel("B");
+	private static final ChannelId<String> CHANNEL_C = stringChannel("C");
+
+	private static final Coroutine<Void, String> SELECT_ABC =
+		Coroutine.first(
+			select(receive(CHANNEL_A), receive(CHANNEL_B), receive(CHANNEL_C)));
 
 	//~ Static methods ---------------------------------------------------------
 
@@ -152,6 +161,38 @@ public class ChannelTest
 					// expected
 					r.errorHandled();
 				}
+			});
+	}
+
+	/***************************************
+	 * Test of channel select.
+	 */
+	@Test
+	public void testChannelSelect()
+	{
+		testSelect(CHANNEL_A);
+		testSelect(CHANNEL_B);
+		testSelect(CHANNEL_C);
+	}
+
+	/***************************************
+	 * Test selecting a certain channel.
+	 *
+	 * @param rId The channel ID
+	 */
+	private void testSelect(ChannelId<String> rId)
+	{
+		launch(
+			run ->
+			{
+				Continuation<String> c = run.async(SELECT_ABC);
+
+				Channel<String> channel = run.context().getChannel(rId);
+
+				channel.sendBlocking("TEST-" + rId);
+
+				assertEquals("TEST-" + rId, c.getResult());
+				assertTrue(c.isFinished());
 			});
 	}
 }
