@@ -20,7 +20,7 @@ import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
-import de.esoco.coroutine.SuspensionGroup;
+import de.esoco.coroutine.Selection;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -140,7 +140,9 @@ public class Select<I, O> extends CoroutineStep<I, O>
 						 Continuation<?>	  rContinuation)
 	{
 		fPreviousExecution.thenAcceptAsync(
-			i -> selectAsync(i, rContinuation.suspendGroup(this, rNextStep)));
+			i -> selectAsync(
+					i,
+					rContinuation.suspendSelection(this, rNextStep)));
 	}
 
 	/***************************************
@@ -149,6 +151,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	@Override
 	protected O execute(I rInput, Continuation<?> rContinuation)
 	{
+		// even if executed blocking the selection must happen asynchronously
 		return rContinuation.scope()
 							.async(new Coroutine<>(this), rInput)
 							.getResult();
@@ -157,24 +160,14 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	/***************************************
 	 * Initiates the asynchronous selection.
 	 *
-	 * @param rInput The input value
-	 * @param rGroup The suspension group
+	 * @param rInput     The input value
+	 * @param rSelection The selection
 	 */
-	void selectAsync(I rInput, SuspensionGroup<O> rGroup)
+	void selectAsync(I rInput, Selection<O> rSelection)
 	{
-		CoroutineScope rScope = rGroup.continuation().scope();
+		CoroutineScope rScope = rSelection.continuation().scope();
 
 		aCoroutines.forEach(
-			rCoroutine ->
-			{
-				Continuation<? extends O> rContinuation =
-					rScope.async(rCoroutine, rInput);
-
-				rGroup.add(rContinuation);
-
-				rContinuation.onFinish(rGroup::continuationFinished)
-				.onCancel(rGroup::continuationCancelled)
-				.onError(rGroup::continuationFailed);
-			});
+			rCoroutine -> { rSelection.add(rScope.async(rCoroutine, rInput)); });
 	}
 }

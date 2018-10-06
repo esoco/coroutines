@@ -88,9 +88,9 @@ public class SelectTest
 			{
 				Channel<String> channel = run.context().getChannel(rId);
 
-				// send first if blocking or else scope will be blocked...
 				if (!bAsync)
 				{
+					// send first if blocking or else scope will remain blocked
 					channel.sendBlocking("TEST-" + rId);
 				}
 

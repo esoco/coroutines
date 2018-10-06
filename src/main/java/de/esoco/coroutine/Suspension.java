@@ -18,6 +18,8 @@ package de.esoco.coroutine;
 
 import de.esoco.lib.concurrent.RunLock;
 
+import java.util.concurrent.CompletableFuture;
+
 
 /********************************************************************
  * Encapsulates the data that represents a suspended {@link Coroutine}. The
@@ -213,5 +215,22 @@ public class Suspension<T>
 		this.rValue = rValue;
 
 		return this;
+	}
+
+	/***************************************
+	 * Resumes this suspension by asynchronously executing the resume step after
+	 * the given future.
+	 *
+	 * @param fResume       The future to append the execution to
+	 * @param rContinuation The current continuation
+	 */
+	void resumeAsync(
+		CompletableFuture<T> fResume,
+		Continuation<?>		 rContinuation)
+	{
+		// the resume step is always either a StepChain which contains it's
+		// own next step or the final step in a coroutine and therefore
+		// rNextStep can be NULL
+		rResumeStep.runAsync(fResume, null, rContinuation);
 	}
 }

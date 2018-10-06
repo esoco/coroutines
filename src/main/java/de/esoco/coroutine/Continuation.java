@@ -20,6 +20,7 @@ import de.esoco.coroutine.Coroutine.Subroutine;
 import de.esoco.coroutine.CoroutineEvent.EventType;
 
 import de.esoco.lib.concurrent.RunLock;
+import de.esoco.lib.expression.Predicates;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -564,25 +565,28 @@ public class Continuation<T> extends RelatedObject implements Executor
 	/***************************************
 	 * Suspends an invoking step to group other suspensions that have been
 	 * created with {@link #suspend(CoroutineStep, CoroutineStep)}. Returns an
-	 * instance of {@link SuspensionGroup} that manages the grouped suspensions
-	 * and resumes the current step depending on the state of the child
-	 * suspensions.
+	 * instance of {@link Selection} that manages the grouped suspensions and
+	 * resumes the current step depending on the state of the child suspensions.
 	 *
 	 * @param  rSuspendingStep The step initiating the suspension
 	 * @param  rSuspendedStep  The step to suspend
 	 *
 	 * @return A new suspension object
 	 */
-	public <V> SuspensionGroup<V> suspendGroup(
+	public <V> Selection<V> suspendSelection(
 		CoroutineStep<?, V> rSuspendingStep,
 		CoroutineStep<V, ?> rSuspendedStep)
 	{
-		SuspensionGroup<V> aSuspensionGroup =
-			new SuspensionGroup<>(rSuspendingStep, rSuspendedStep, this);
+		Selection<V> aSelection =
+			new Selection<>(
+				Predicates.alwaysTrue(),
+				rSuspendingStep,
+				rSuspendedStep,
+				this);
 
-		suspendTo(aSuspensionGroup);
+		suspendTo(aSelection);
 
-		return aSuspensionGroup;
+		return aSelection;
 	}
 
 	/***************************************
@@ -656,10 +660,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 			CompletableFuture<I> fResume =
 				CompletableFuture.supplyAsync(() -> rInput, this);
 
-			// the resume step is always either a StepChain which contains it's
-			// own next step or the final step in a coroutine and therefore
-			// rNextStep can be NULL
-			rSuspension.getResumeStep().runAsync(fResume, null, this);
+			rSuspension.resumeAsync(fResume, this);
 		}
 
 		rCurrentSuspension = null;
@@ -690,7 +691,8 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 	/***************************************
 	 * Internal implementation of suspension with {@link #suspend(CoroutineStep,
-	 * CoroutineStep)} and {@link #suspendGroup(CoroutineStep, CoroutineStep)}.
+	 * CoroutineStep)} and {@link #suspendSelection(CoroutineStep,
+	 * CoroutineStep)}.
 	 *
 	 * @param rSuspension The suspension to suspend to
 	 */
