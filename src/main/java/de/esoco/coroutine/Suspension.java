@@ -105,26 +105,6 @@ public class Suspension<T>
 	}
 
 	/***************************************
-	 * Returns the step to be execute when resuming.
-	 *
-	 * @return The resume step
-	 */
-	public final CoroutineStep<T, ?> getResumeStep()
-	{
-		return rResumeStep;
-	}
-
-	/***************************************
-	 * Returns the step that initiated this suspension.
-	 *
-	 * @return The suspending step
-	 */
-	public final CoroutineStep<?, T> getSuspendingStep()
-	{
-		return rSuspendingStep;
-	}
-
-	/***************************************
 	 * Executes code only if this suspension has not (yet) been cancel. The
 	 * given code will be executed with a lock on the cancelation state to
 	 * prevent race conditions if other threads try to cancel a suspension while
@@ -174,8 +154,20 @@ public class Suspension<T>
 		if (!bCancelled)
 		{
 			this.rValue = rValue;
-			rContinuation.resumeSuspension(this, rValue);
+			rContinuation.suspensionResumed(this);
+
+			resumeAsync();
 		}
+	}
+
+	/***************************************
+	 * Returns the suspending step.
+	 *
+	 * @return The suspending step
+	 */
+	public final CoroutineStep<?, T> suspendingStep()
+	{
+		return rSuspendingStep;
 	}
 
 	/***************************************
@@ -218,19 +210,16 @@ public class Suspension<T>
 	}
 
 	/***************************************
-	 * Resumes this suspension by asynchronously executing the resume step after
-	 * the given future.
-	 *
-	 * @param fResume       The future to append the execution to
-	 * @param rContinuation The current continuation
+	 * Resumes this suspension by asynchronously executing the resume step.
 	 */
-	void resumeAsync(
-		CompletableFuture<T> fResume,
-		Continuation<?>		 rContinuation)
+	void resumeAsync()
 	{
 		// the resume step is always either a StepChain which contains it's
 		// own next step or the final step in a coroutine and therefore
 		// rNextStep can be NULL
-		rResumeStep.runAsync(fResume, null, rContinuation);
+		rResumeStep.runAsync(
+			CompletableFuture.supplyAsync(() -> rValue, rContinuation),
+			null,
+			rContinuation);
 	}
 }

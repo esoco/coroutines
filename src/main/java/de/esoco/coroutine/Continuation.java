@@ -20,7 +20,6 @@ import de.esoco.coroutine.Coroutine.Subroutine;
 import de.esoco.coroutine.CoroutineEvent.EventType;
 
 import de.esoco.lib.concurrent.RunLock;
-import de.esoco.lib.expression.Predicates;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -554,39 +553,34 @@ public class Continuation<T> extends RelatedObject implements Executor
 		CoroutineStep<?, V> rSuspendingStep,
 		CoroutineStep<V, ?> rSuspendedStep)
 	{
-		Suspension<V> aSuspension =
-			new Suspension<>(rSuspendingStep, rSuspendedStep, this);
-
-		suspendTo(aSuspension);
-
-		return aSuspension;
+		return suspendTo(
+			new Suspension<>(rSuspendingStep, rSuspendedStep, this));
 	}
 
 	/***************************************
-	 * Suspends an invoking step to group other suspensions that have been
-	 * created with {@link #suspend(CoroutineStep, CoroutineStep)}. Returns an
-	 * instance of {@link Selection} that manages the grouped suspensions and
-	 * resumes the current step depending on the state of the child suspensions.
+	 * Suspends an invoking step for later invocation with the given instance of
+	 * a suspension subclass. This method is only intended for special
+	 * suspension cases. Most step implementations should call {@link
+	 * #suspend(CoroutineStep, CoroutineStep)} instead.
 	 *
-	 * @param  rSuspendingStep The step initiating the suspension
-	 * @param  rSuspendedStep  The step to suspend
+	 * @param  rSuspension The suspension to suspend to
 	 *
-	 * @return A new suspension object
+	 * @return The suspension object
 	 */
-	public <V> Selection<V> suspendSelection(
-		CoroutineStep<?, V> rSuspendingStep,
-		CoroutineStep<V, ?> rSuspendedStep)
+	public <V> Suspension<V> suspendTo(Suspension<V> rSuspension)
 	{
-		Selection<V> aSelection =
-			new Selection<>(
-				Predicates.alwaysTrue(),
-				rSuspendingStep,
-				rSuspendedStep,
-				this);
+		// only one suspension per continuation is possible
+		assert rCurrentSuspension == null;
 
-		suspendTo(aSelection);
+		rScope.addSuspension(rSuspension);
+		rCurrentSuspension = rSuspension;
 
-		return aSelection;
+		if (fSuspensionListener != null)
+		{
+			fSuspensionListener.accept(rCurrentSuspension, true);
+		}
+
+		return rSuspension;
 	}
 
 	/***************************************
@@ -641,32 +635,6 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
-	 * Resumes a suspension.
-	 *
-	 * @param rSuspension The suspension to resume
-	 * @param rInput      The input for the resumed step
-	 */
-	<I> void resumeSuspension(Suspension<I> rSuspension, I rInput)
-	{
-		assert rCurrentSuspension == rSuspension;
-
-		if (!isCancelled())
-		{
-			if (fSuspensionListener != null)
-			{
-				fSuspensionListener.accept(rCurrentSuspension, false);
-			}
-
-			CompletableFuture<I> fResume =
-				CompletableFuture.supplyAsync(() -> rInput, this);
-
-			rSuspension.resumeAsync(fResume, this);
-		}
-
-		rCurrentSuspension = null;
-	}
-
-	/***************************************
 	 * Removes a subroutine from the coroutines stack when it has finished
 	 * execution.
 	 */
@@ -690,24 +658,23 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
-	 * Internal implementation of suspension with {@link #suspend(CoroutineStep,
-	 * CoroutineStep)} and {@link #suspendSelection(CoroutineStep,
-	 * CoroutineStep)}.
+	 * Gets notified by {@link Suspension#resume(Object)} upon resuming.
 	 *
-	 * @param rSuspension The suspension to suspend to
+	 * @param rSuspension The suspension to resume
 	 */
-	void suspendTo(Suspension<?> rSuspension)
+	<I> void suspensionResumed(Suspension<I> rSuspension)
 	{
-		// only one suspension per continuation is possible
-		assert rCurrentSuspension == null;
+		assert rCurrentSuspension == rSuspension;
 
-		rScope.addSuspension(rSuspension);
-		rCurrentSuspension = rSuspension;
-
-		if (fSuspensionListener != null)
+		if (!isCancelled())
 		{
-			fSuspensionListener.accept(rCurrentSuspension, true);
+			if (fSuspensionListener != null)
+			{
+				fSuspensionListener.accept(rCurrentSuspension, false);
+			}
 		}
+
+		rCurrentSuspension = null;
 	}
 
 	/***************************************
