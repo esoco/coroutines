@@ -42,6 +42,8 @@ import static de.esoco.coroutine.Coroutines.COROUTINE_SUSPENSION_LISTENER;
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.Coroutines.closeManagedResources;
 
+import static org.obrel.type.StandardTypes.NAME;
+
 
 /********************************************************************
  * A continuation represents the state of a coroutine execution. It can be used
@@ -591,7 +593,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	{
 		return String.format(
 			"%s-%d[%s]",
-			getClass().getSimpleName(),
+			getCurrentCoroutine().get(NAME),
 			nId,
 			rResult);
 	}

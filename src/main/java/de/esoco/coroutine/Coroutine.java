@@ -174,21 +174,23 @@ import static org.obrel.type.StandardTypes.NAME;
  * to modify relations in the scope or context it must perform the necessary
  * synchronization itself.</p>
  *
- * <p><b>Attention:</b> Should synchronization be necessary it should be applied
- * with caution. Coroutines implement <b>cooperative multi-tasking</b>. That
- * means that the steps are executed in a thread pool which typically assumes
- * that the code running in the pool only occupies a thread as long as needed
- * for processing. Blocking such a thread in some way (like waiting for a lock,
+ * <p><b>Attention:</b> Any synchronization between coroutines should be applied
+ * with caution. Coroutines implement <b>cooperative multi-tasking</b> by
+ * executing their steps in a thread pool. These pools assume that the code
+ * running in a pool thread only occupies it as long as needed for the
+ * processing. Blocking such a thread in some way (like waiting for a lock,
  * accessing a synchronized resource, or just sleeping) counteracts the purpose
  * of the thread pool in particular and of cooperative multi-tasking in general.
- * Therefore it is strongly advised to not perform "classical" synchronizations
- * from coroutine steps. Instead it should be checked whether it is possible to
- * implement this in a cooperative way by suspending the coroutine execution
- * while waiting for a resource. An example would be to perform the waiting in a
- * separate thread (outside of the coroutine thread pool) and resume the
- * coroutine when the resource becomes available. An even better way would be to
- * use a natively asynchronous API like in the java.nio package (see the
- * sub-package 'step.nio' for examples).</p>
+ * </p>
+ *
+ * <p>Therefore it is strongly advised to not perform "classical"
+ * synchronizations from coroutine steps. Instead it should be checked whether
+ * it is possible to implement this in a cooperative way by suspending the
+ * coroutine execution while waiting for a resource. An example would be to
+ * perform the waiting in a separate thread (outside of the coroutine thread
+ * pool) and resume the coroutine when the resource becomes available. An even
+ * better way would be to use a natively asynchronous API like in the java.nio
+ * package (see the sub-package 'step.nio' for examples).</p>
  *
  * @author eso
  */

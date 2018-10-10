@@ -332,6 +332,19 @@ public class CoroutineScope extends CoroutineEnvironment
 	}
 
 	/***************************************
+	 * Non-blockingly checks whether this scope has finished execution of all
+	 * coroutines. Due to the asynchronous nature of coroutine executions this
+	 * method will only return when preceded by a blocking call like {@link
+	 * #await()}.
+	 *
+	 * @return TRUE if finished
+	 */
+	public boolean isFinished()
+	{
+		return aFinishSignal.getCount() == 0;
+	}
+
+	/***************************************
 	 * Removes a channel from this scope or from the {@link CoroutineContext}.
 	 * If it exists in both it will only be removed from this scope.
 	 *

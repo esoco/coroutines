@@ -16,13 +16,20 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
+import de.esoco.coroutine.step.Collect;
+import de.esoco.coroutine.step.Select;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static de.esoco.coroutine.ChannelId.stringChannel;
 import static de.esoco.coroutine.CoroutineScope.launch;
-import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.step.ChannelReceive.receive;
+import static de.esoco.coroutine.step.Collect.collect;
 import static de.esoco.coroutine.step.Select.select;
 
 import static org.junit.Assert.assertEquals;
@@ -30,11 +37,11 @@ import static org.junit.Assert.assertTrue;
 
 
 /********************************************************************
- * Test of {@link Coroutine}.
+ * Test of {@link Selection} steps {@link Select} and {@link Collect}.
  *
  * @author eso
  */
-public class SelectTest
+public class SelectionTest
 {
 	//~ Static fields/initializers ---------------------------------------------
 
@@ -42,10 +49,18 @@ public class SelectTest
 	private static final ChannelId<String> CHANNEL_B = stringChannel("B");
 	private static final ChannelId<String> CHANNEL_C = stringChannel("C");
 
+	private static final List<ChannelId<String>> ALL_CHANNELS =
+		Arrays.asList(CHANNEL_A, CHANNEL_B, CHANNEL_C);
+
 	private static final Coroutine<Void, String> SELECT_ABC =
 		Coroutine.first(
 			select(receive(CHANNEL_A)).or(receive(CHANNEL_B))
 			.or(receive(CHANNEL_C)));
+
+	private static final Coroutine<Void, Collection<String>> COLLECT_ABC =
+		Coroutine.first(
+			collect(receive(CHANNEL_A)).and(receive(CHANNEL_B))
+			.and(receive(CHANNEL_C)));
 
 	//~ Static methods ---------------------------------------------------------
 
@@ -56,7 +71,7 @@ public class SelectTest
 	public static void setup()
 	{
 		// suppress stacktraces from error testing
-		Coroutines.getDefaultContext().set(EXCEPTION_HANDLER, t ->{});
+//		Coroutines.getDefaultContext().set(EXCEPTION_HANDLER, t ->{});
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -65,8 +80,19 @@ public class SelectTest
 	 * Test of channel select.
 	 */
 	@Test
+	public void testChannelCollect()
+	{
+		testCollect(true);
+		testCollect(false);
+	}
+
+	/***************************************
+	 * Test of channel select.
+	 */
+	@Test
 	public void testChannelSelect()
 	{
+		// execute multiple times to test for "cross-talk" between calls
 		testSelect(CHANNEL_A, true);
 		testSelect(CHANNEL_B, true);
 		testSelect(CHANNEL_C, true);
@@ -76,7 +102,41 @@ public class SelectTest
 	}
 
 	/***************************************
-	 * Test selecting a certain channel.
+	 * Test of collecting from channels.
+	 *
+	 * @param bAsync Async or blocking
+	 */
+	private void testCollect(boolean bAsync)
+	{
+		launch(
+			run ->
+			{
+				if (!bAsync)
+				{
+					// send first if blocking or else scope will remain blocked
+					ALL_CHANNELS.forEach(
+						id -> run.getChannel(id).sendBlocking(id.toString()));
+				}
+
+				Continuation<Collection<String>> c =
+					bAsync ? run.async(COLLECT_ABC) : run.blocking(COLLECT_ABC);
+
+				if (bAsync)
+				{
+					ALL_CHANNELS.forEach(
+						id -> run.getChannel(id).sendBlocking(id.toString()));
+				}
+
+				Collection<String> rResult = c.getResult();
+
+				ALL_CHANNELS.forEach(
+					id -> assertTrue(rResult.contains(id.toString())));
+				assertTrue(c.isFinished());
+			});
+	}
+
+	/***************************************
+	 * Test of selecting from a certain channel.
 	 *
 	 * @param rId    The channel ID
 	 * @param bAsync Async or blocking
@@ -86,12 +146,12 @@ public class SelectTest
 		launch(
 			run ->
 			{
-				Channel<String> channel = run.context().getChannel(rId);
+				Channel<String> channel = run.getChannel(rId);
 
 				if (!bAsync)
 				{
 					// send first if blocking or else scope will remain blocked
-					channel.sendBlocking("TEST-" + rId);
+					channel.sendBlocking(rId.toString());
 				}
 
 				Continuation<String> c =
@@ -99,10 +159,10 @@ public class SelectTest
 
 				if (bAsync)
 				{
-					channel.sendBlocking("TEST-" + rId);
+					channel.sendBlocking(rId.toString());
 				}
 
-				assertEquals("TEST-" + rId, c.getResult());
+				assertEquals(rId.toString(), c.getResult());
 				assertTrue(c.isFinished());
 			});
 	}

@@ -101,7 +101,12 @@ public class Suspension<T>
 	 */
 	public void fail(Throwable eError)
 	{
-		rContinuation.fail(eError);
+		aCancelLock.runLocked(() -> bCancelled = true);
+
+		if (!rContinuation.isCancelled())
+		{
+			rContinuation.fail(eError);
+		}
 	}
 
 	/***************************************
@@ -128,7 +133,7 @@ public class Suspension<T>
 	 *
 	 * @return TRUE if the suspension has been cancelled
 	 */
-	public boolean isCancelled()
+	public final boolean isCancelled()
 	{
 		return bCancelled;
 	}

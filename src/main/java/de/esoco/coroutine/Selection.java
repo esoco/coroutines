@@ -27,7 +27,9 @@ import java.util.function.Predicate;
 
 /********************************************************************
  * A {@link Suspension} subclass that selects the suspension result from one or
- * more of multiple continuations based on certain criteria.
+ * more of multiple continuations based on certain criteria. If a child
+ * continuation fails the selection step will also fail. If a child continuation
+ * is cancelled, it will simply be ignored.
  *
  * @author eso
  */
@@ -40,13 +42,15 @@ public class Selection<T, V, R> extends Suspension<T>
 	private final Predicate<Continuation<?>> pComplete;
 	private final boolean					 bSingleValue;
 
-	private boolean bComplete = false;
-	private List<V> aResults  = new ArrayList<>();
+	private boolean  bSealed	   = false;
+	private boolean  bFinished     = false;
+	private Runnable fFinishAction = this::resume;
+	private List<V>  aResults	   = new ArrayList<>();
 
 	private final List<Continuation<? extends V>> aContinuations =
 		new ArrayList<>();
 
-	private final RunLock aCompletionLock = new RunLock();
+	private final RunLock aStateLock = new RunLock();
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -82,8 +86,8 @@ public class Selection<T, V, R> extends Suspension<T>
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance for the selection of a multiple values. If no
-	 * values are selected the result will be an empty collection.
+	 * Creates a new instance for the selection of multiple values. If no values
+	 * are selected the result will be an empty collection.
 	 *
 	 * @param  rSuspendingStep The step that initiated the suspension
 	 * @param  rResumeStep     The step to resume the execution with
@@ -148,15 +152,24 @@ public class Selection<T, V, R> extends Suspension<T>
 	 */
 	public void add(Continuation<? extends V> rContinuation)
 	{
-		if (!bComplete)
-		{
-			aContinuations.add(rContinuation);
+		aStateLock.runLocked(
+			() ->
+			{
+				if (bSealed)
+				{
+					throw new IllegalStateException("Selection is sealed");
+				}
 
-			rContinuation.onFinish(this::continuationFinished)
-						 .onCancel(this::continuationCancelled)
-						 .onError(this::continuationFailed);
-		}
-		else
+				// first add to make sure remove after an immediate return by
+				// the following callbacks is applied
+				aContinuations.add(rContinuation);
+			});
+
+		rContinuation.onFinish(this::continuationFinished)
+					 .onCancel(this::continuationCancelled)
+					 .onError(this::continuationFailed);
+
+		if (bFinished)
 		{
 			rContinuation.cancel();
 		}
@@ -168,52 +181,29 @@ public class Selection<T, V, R> extends Suspension<T>
 	@Override
 	public void cancel()
 	{
-		aCompletionLock.runLocked(
+		aStateLock.runLocked(
 			() ->
-		{
-			if (!bComplete)
 			{
-				cancelRemaining();
-			}
-		});
+				bFinished     = true;
+				fFinishAction = this::cancel;
 
-		super.cancel();
+				checkComplete();
+			});
 	}
 
 	/***************************************
-	 * {@inheritDoc}
+	 * Seals this instance so that no more coroutines can be added with {@link
+	 * #add(Continuation)}. Sealing is necessary to allow the adding of further
+	 * coroutines even if previously added coroutines have already finished
+	 * execution.
 	 */
-	@Override
-	public void fail(Throwable eError)
+	public void seal()
 	{
-		aCompletionLock.runLocked(
-			() ->
+		aStateLock.runLocked(() ->
 		{
-			if (!bComplete)
-			{
-				cancelRemaining();
-			}
+			bSealed = true;
+			checkComplete();
 		});
-
-		super.fail(eError);
-	}
-
-	/***************************************
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void resume(T rValue)
-	{
-		aCompletionLock.runLocked(
-			() ->
-		{
-			if (!bComplete)
-			{
-				cancelRemaining();
-			}
-		});
-
-		super.resume(rValue);
 	}
 
 	/***************************************
@@ -230,54 +220,67 @@ public class Selection<T, V, R> extends Suspension<T>
 	}
 
 	/***************************************
-	 * Notification from a continuation when it is cancelled.
+	 * Notified when a continuation is cancelled. Cancelled continuations will
+	 * only be removed but the selection will continue.
 	 *
-	 * @param rContinuation The cancelled continuation
+	 * @param rContinuation The finished continuation
 	 */
+	@SuppressWarnings("unchecked")
 	void continuationCancelled(Continuation<? extends V> rContinuation)
 	{
-		if (!bComplete)
-		{
-			aContinuations.remove(rContinuation);
-			cancelRemaining();
-			cancel();
-		}
+		aStateLock.runLocked(
+			() ->
+			{
+				aContinuations.remove(rContinuation);
+				checkComplete();
+			});
 	}
 
 	/***************************************
-	 * Notification from a continuation when it failed.
+	 * Notified when the execution of a continuation failed. In that case the
+	 * full selection will fail too.
 	 *
-	 * @param rContinuation The failed {@link Continuation}
+	 * @param rContinuation The finished continuation
 	 */
+	@SuppressWarnings("unchecked")
 	void continuationFailed(Continuation<? extends V> rContinuation)
 	{
-		if (!bComplete)
-		{
-			aContinuations.remove(rContinuation);
-			cancelRemaining();
-			fail(rContinuation.getError());
-		}
+		aStateLock.runLocked(
+			() ->
+			{
+				aContinuations.remove(rContinuation);
+				bFinished     = true;
+				fFinishAction = () -> fail(rContinuation.getError());
+
+				checkComplete();
+			});
 	}
 
 	/***************************************
-	 * Notification from a continuation when it is resumed.
+	 * Notified when a continuation is finished.
 	 *
 	 * @param rContinuation The finished continuation
 	 */
 	@SuppressWarnings("unchecked")
 	void continuationFinished(Continuation<? extends V> rContinuation)
 	{
-		if (pSelect.test(rContinuation))
-		{
-			aResults.add(rContinuation.getResult());
-		}
+		aStateLock.runLocked(
+			() ->
+			{
+				aContinuations.remove(rContinuation);
 
-		if (isCompletedBy(rContinuation))
-		{
-			aContinuations.remove(rContinuation);
-			cancelRemaining();
-			resume();
-		}
+				if (!bFinished)
+				{
+					if (pSelect.test(rContinuation))
+					{
+						aResults.add(rContinuation.getResult());
+					}
+
+					bFinished = pComplete.test(rContinuation);
+				}
+
+				checkComplete();
+			});
 	}
 
 	/***************************************
@@ -301,36 +304,26 @@ public class Selection<T, V, R> extends Suspension<T>
 	}
 
 	/***************************************
-	 * Cancels all remaining continuations.
+	 * Resumes this selection if it is sealed and contains no more
+	 * continuations.
 	 */
-	private void cancelRemaining()
+	private void checkComplete()
 	{
-		for (Continuation<? extends V> rContinuation : aContinuations)
+		if (bFinished && !aContinuations.isEmpty())
 		{
-			rContinuation.cancel();
+			// cancel all remaining continuations if already finished; needs to
+			// be done with a copied list because cancel may modify the list
+			new ArrayList<>(aContinuations).forEach(Continuation::cancel);
 		}
 
-		aContinuations.clear();
-	}
-
-	/***************************************
-	 * Checks whether a certain continuation completes this selection.
-	 *
-	 * @param  rContinuation The continuation to check
-	 *
-	 * @return TRUE if the selection is completed
-	 */
-	private boolean isCompletedBy(Continuation<? extends V> rContinuation)
-	{
-		aCompletionLock.runLocked(
-			() ->
+		// only finish if all child continuations have finished to race
+		// conditions with subsequent step executions
+		if (bSealed && aContinuations.isEmpty())
 		{
-			if (!bComplete)
-			{
-				bComplete = pComplete.test(rContinuation);
-			}
-		});
+			bFinished = true;
 
-		return bComplete;
+			// will either resume, cancel, or fail this suspension
+			fFinishAction.run();
+		}
 	}
 }

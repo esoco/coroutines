@@ -33,8 +33,26 @@ import static java.util.Arrays.asList;
 
 
 /********************************************************************
- * A coroutine step that suspends the coroutine execution until one or more of
- * several asynchronously executed coroutines resumes.
+ * A coroutine step that suspends the coroutine execution until the first
+ * matching result of several other asynchronously executed coroutines are
+ * available. The selecting coroutine is then resumed with the selected result.
+ * By default the result of the coroutine that finished first will be selected
+ * but that can be modified by setting a different condition with {@link
+ * #when(Predicate)}. If a result is selected all coroutines that are sill
+ * running will be cancelled and execution of the selecting coroutine is
+ * resumed.
+ *
+ * <p>The main purpose of this step is to non-blockingly select the first result
+ * from other suspending coroutines although it can be used with arbitrary
+ * coroutines and steps. It should be noted that if both suspending and
+ * non-suspending selection targets are used the non-suspending targets will
+ * almost always be selected. Even when using only suspending coroutines the
+ * selection will be slightly biased towards the first coroutine because the
+ * coroutines need to be launched sequentially, giving the first coroutine(s) a
+ * head start.</p>
+ *
+ * <p>To select more than one result from the child coroutines the related step
+ * implementation {@link Collect} can be used.</p>
  *
  * @author eso
  */
@@ -59,7 +77,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 		if (rFromCoroutines.size() == 0)
 		{
 			throw new IllegalArgumentException(
-				"At least one coroutine to select required");
+				"At least one coroutine to select is required");
 		}
 
 		aCoroutines.addAll(rFromCoroutines);
@@ -83,7 +101,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 * Suspends the coroutine execution until one coroutine finishes and then
 	 * resumes the execution with the result. By default the result of the first
 	 * finished coroutine is selected. That can be modified by providing a
-	 * different selection condition to {@link #until(Predicate)} which will
+	 * different selection condition to {@link #when(Predicate)} which will
 	 * return a new {@link Select} instance. Modified instances that select from
 	 * additional coroutines or steps can be created with {@link #or(Coroutine)}
 	 * and {@link #or(CoroutineStep)}.
@@ -138,7 +156,8 @@ public class Select<I, O> extends CoroutineStep<I, O>
 
 	/***************************************
 	 * Creates a new instance that selects from an additional step. The step
-	 * will be wrapped into a new coroutine.
+	 * will be wrapped into a new coroutine and handed to {@link
+	 * #or(Coroutine)}.
 	 *
 	 * @param  rStep The additional step to select from
 	 *
@@ -162,7 +181,10 @@ public class Select<I, O> extends CoroutineStep<I, O>
 						 Continuation<?>	  rContinuation)
 	{
 		fPreviousExecution.thenAcceptAsync(
-			i -> selectAsync(i, rNextStep, rContinuation));
+				  			rInput ->
+				  				selectAsync(rInput, rNextStep, rContinuation))
+						  .exceptionally(t ->
+				  				rContinuation.fail(t));
 	}
 
 	/***************************************
@@ -175,7 +197,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 *
 	 * @return A new step instance
 	 */
-	public Select<I, O> until(Predicate<Continuation<?>> pSelectCriteria)
+	public Select<I, O> when(Predicate<Continuation<?>> pSelectCriteria)
 	{
 		Select<I, O> aSelect = new Select<>(aCoroutines);
 
@@ -190,14 +212,15 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	@Override
 	protected O execute(I rInput, Continuation<?> rContinuation)
 	{
-		// even if executed blocking the selection must happen asynchronously
+		// even if executed blocking the selection must happen asynchronously,
+		// so we just run this step as a new coroutine in the current scope
 		return rContinuation.scope()
 							.async(new Coroutine<>(this), rInput)
 							.getResult();
 	}
 
 	/***************************************
-	 * Initiates the asynchronous selection.
+	 * Performs the asynchronous selection.
 	 *
 	 * @param rInput        The input value
 	 * @param rNextStep     The step to resume after the suspension
@@ -208,13 +231,19 @@ public class Select<I, O> extends CoroutineStep<I, O>
 					 Continuation<?>	 rContinuation)
 	{
 		Selection<O, O, O> aSelection =
-			Selection.ofSingleValue(this, rNextStep, rContinuation, c -> true);
+			Selection.ofSingleValue(
+				this,
+				rNextStep,
+				rContinuation,
+				pSelectCritiera);
 
 		CoroutineScope rScope = rContinuation.scope();
 
 		rContinuation.suspendTo(aSelection);
 
 		aCoroutines.forEach(
-			rCoroutine -> { aSelection.add(rScope.async(rCoroutine, rInput)); });
+			rCoroutine -> aSelection.add(rScope.async(rCoroutine, rInput)));
+
+		aSelection.seal();
 	}
 }
