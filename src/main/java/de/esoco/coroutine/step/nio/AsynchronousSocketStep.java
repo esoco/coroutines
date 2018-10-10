@@ -20,7 +20,6 @@ import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
-import de.esoco.coroutine.Suspending;
 import de.esoco.coroutine.Suspension;
 
 import java.io.IOException;
@@ -50,7 +49,6 @@ import static org.obrel.core.RelationTypes.newType;
  * @author eso
  */
 public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
-	implements Suspending
 {
 	//~ Static fields/initializers ---------------------------------------------
 

@@ -21,7 +21,6 @@ import de.esoco.coroutine.ChannelId;
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
-import de.esoco.coroutine.Suspending;
 
 import java.util.Objects;
 
@@ -34,7 +33,6 @@ import org.obrel.core.RelationType;
  * @author eso
  */
 public abstract class ChannelStep<I, O> extends CoroutineStep<I, O>
-	implements Suspending
 {
 	//~ Instance fields --------------------------------------------------------
 

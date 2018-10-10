@@ -20,7 +20,6 @@ import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
-import de.esoco.coroutine.Suspending;
 
 import de.esoco.lib.datatype.Pair;
 
@@ -39,7 +38,7 @@ import static org.obrel.type.StandardTypes.DURATION;
  *
  * @author eso
  */
-public class Delay<T> extends CoroutineStep<T, T> implements Suspending
+public class Delay<T> extends CoroutineStep<T, T>
 {
 	//~ Constructors -----------------------------------------------------------
 
