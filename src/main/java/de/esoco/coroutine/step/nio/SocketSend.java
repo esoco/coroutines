@@ -87,7 +87,7 @@ public class SocketSend extends AsynchronousSocketStep
 	 */
 	@Override
 	protected boolean performAsyncOperation(
-		int													nBytesProcessed,
+		int													nBytesSent,
 		AsynchronousSocketChannel							rChannel,
 		ByteBuffer											rData,
 		ChannelCallback<Integer, AsynchronousSocketChannel> rCallback)

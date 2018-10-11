@@ -73,7 +73,7 @@ public abstract class AsynchronousChannelStep<I, O> extends CoroutineStep<I, O>
 
 	static
 	{
-		RelationTypes.init(AsynchronousSocketStep.class);
+		RelationTypes.init(AsynchronousChannelStep.class);
 	}
 
 	//~ Methods ----------------------------------------------------------------

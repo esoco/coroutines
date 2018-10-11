@@ -27,8 +27,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.charset.StandardCharsets;
 
+import java.util.function.BiPredicate;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 
 /********************************************************************
@@ -40,7 +40,7 @@ public class SocketReceive extends AsynchronousSocketStep
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private final Predicate<ByteBuffer> pCheckFinished;
+	private final BiPredicate<Integer, ByteBuffer> pCheckFinished;
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -55,7 +55,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	 */
 	public SocketReceive(
 		Function<Continuation<?>, SocketAddress> fGetSocketAddress,
-		Predicate<ByteBuffer>					 pCheckFinished)
+		BiPredicate<Integer, ByteBuffer>		 pCheckFinished)
 	{
 		super(fGetSocketAddress);
 
@@ -73,7 +73,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	 *
 	 * @return A new predicate instance
 	 */
-	public static Predicate<ByteBuffer> contentFullyRead()
+	public static BiPredicate<Integer, ByteBuffer> contentFullyRead()
 	{
 		return new CheckContentLength();
 	}
@@ -101,7 +101,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	public static SocketReceive receiveFrom(
 		Function<Continuation<?>, SocketAddress> fGetSocketAddress)
 	{
-		return new SocketReceive(fGetSocketAddress, bb -> true);
+		return new SocketReceive(fGetSocketAddress, (r, bb) -> true);
 	}
 
 	/***************************************
@@ -128,7 +128,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	 * @return A new step instance
 	 */
 	public static SocketReceive receiveUntil(
-		Predicate<ByteBuffer> pCheckFinished)
+		BiPredicate<Integer, ByteBuffer> pCheckFinished)
 	{
 		return receiveFrom((SocketAddress) null).until(pCheckFinished);
 	}
@@ -147,7 +147,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	 *
 	 * @return A new step instance
 	 */
-	public SocketReceive until(Predicate<ByteBuffer> pCheckFinished)
+	public SocketReceive until(BiPredicate<Integer, ByteBuffer> pCheckFinished)
 	{
 		return new SocketReceive(getSocketAddressFactory(), pCheckFinished);
 	}
@@ -157,7 +157,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	 */
 	@Override
 	protected boolean performAsyncOperation(
-		int													nReceived,
+		int													nBytesReceived,
 		AsynchronousSocketChannel							rChannel,
 		ByteBuffer											rData,
 		ChannelCallback<Integer, AsynchronousSocketChannel> rCallback)
@@ -165,23 +165,19 @@ public class SocketReceive extends AsynchronousSocketStep
 	{
 		boolean bFinished = false;
 
-		if (nReceived == FIRST_OPERATION)
+		if (nBytesReceived >= 0)
+		{
+			bFinished = pCheckFinished.test(nBytesReceived, rData);
+		}
+
+		if (nBytesReceived != -1 && !bFinished && rData.hasRemaining())
 		{
 			rChannel.read(rData, rData, rCallback);
 		}
 		else
 		{
-			bFinished = pCheckFinished.test(rData);
-
-			if (!bFinished && rData.hasRemaining())
-			{
-				rChannel.read(rData, rData, rCallback);
-			}
-			else
-			{
-				checkErrors(rData, nReceived, bFinished);
-				rData.flip();
-			}
+			checkErrors(rData, nBytesReceived, bFinished);
+			rData.flip();
 		}
 
 		return bFinished;
@@ -201,7 +197,7 @@ public class SocketReceive extends AsynchronousSocketStep
 		do
 		{
 			nReceived = aChannel.read(rData).get();
-			bFinished = pCheckFinished.test(rData);
+			bFinished = pCheckFinished.test(nReceived, rData);
 		}
 		while (nReceived != -1 && !bFinished && rData.hasRemaining());
 
@@ -242,7 +238,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	 *
 	 * @author eso
 	 */
-	static class CheckContentLength implements Predicate<ByteBuffer>
+	static class CheckContentLength implements BiPredicate<Integer, ByteBuffer>
 	{
 		//~ Static fields/initializers -----------------------------------------
 
@@ -258,7 +254,7 @@ public class SocketReceive extends AsynchronousSocketStep
 		 * {@inheritDoc}
 		 */
 		@Override
-		public boolean test(ByteBuffer rBuffer)
+		public boolean test(Integer nReceived, ByteBuffer rBuffer)
 		{
 			if (nFullLength == -1)
 			{

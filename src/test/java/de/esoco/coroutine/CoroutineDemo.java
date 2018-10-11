@@ -22,12 +22,16 @@ import java.net.InetSocketAddress;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.StandardOpenOption;
 
 import java.util.concurrent.CountDownLatch;
 
 import static de.esoco.coroutine.Coroutine.first;
 import static de.esoco.coroutine.CoroutineScope.launch;
+import static de.esoco.coroutine.step.CodeExecution.apply;
 import static de.esoco.coroutine.step.CodeExecution.run;
+import static de.esoco.coroutine.step.nio.FileRead.readFrom;
+import static de.esoco.coroutine.step.nio.FileWrite.writeTo;
 import static de.esoco.coroutine.step.nio.SocketReceive.contentFullyRead;
 import static de.esoco.coroutine.step.nio.SocketReceive.receiveUntil;
 import static de.esoco.coroutine.step.nio.SocketSend.sendTo;
@@ -43,6 +47,40 @@ import static de.esoco.lib.datatype.Range.from;
 public class CoroutineDemo
 {
 	//~ Static methods ---------------------------------------------------------
+
+	/***************************************
+	 * A demo of asynchronous file I/O based on Jav NIO.
+	 */
+	public static void demoFileIO()
+	{
+		Coroutine<ByteBuffer, ?> fileWrite =
+			first(writeTo("test.file", StandardOpenOption.CREATE));
+
+		Coroutine<ByteBuffer, String> fileRead =
+			first(readFrom("test.file")).then(
+				apply(bb -> StandardCharsets.UTF_8.decode(bb).toString()));
+
+		ByteBuffer aWriteData =
+			ByteBuffer.wrap(
+				("Lorem ipsum dolor sit amet, consectetuer adipiscing elit, " +
+					"sed diem nonummy nibh euismod tincidunt ut lacreet dolore " +
+					"magna aliguam erat volutpat. Ut wisis enim ad minim veniam, " +
+					"quis nostrud exerci tution ullamcorper suscipit lobortis " +
+					"nisl ut aliquip ex ea commodo consequat.\n").getBytes());
+
+		launch(run -> { run.async(fileWrite, aWriteData); });
+
+		// separate scope to wait until fully written
+		launch(
+			run ->
+			{
+				ByteBuffer aReadData = ByteBuffer.allocate(10_000);
+
+				Continuation<String> c = run.async(fileRead, aReadData);
+
+				System.out.printf("READ: \n%s\n", c.getResult());
+			});
+	}
 
 	/***************************************
 	 * Runs coroutines parallel in threads and with asynchronous execution for
@@ -97,7 +135,7 @@ public class CoroutineDemo
 	}
 
 	/***************************************
-	 * Creates a new instance.
+	 * A demo of asynchronous socket communication based on Jav NIO.
 	 */
 	public static void demoSocketCommunication()
 	{
@@ -133,6 +171,7 @@ public class CoroutineDemo
 	public static void main(String[] rArgs)
 	{
 //		demoParallelExecution();
-		demoSocketCommunication();
+//		demoSocketCommunication();
+//		demoFileIO();
 	}
 }
