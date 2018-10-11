@@ -373,9 +373,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 *
 	 * @see #getState(RelationType, Object)
 	 */
-	public <V> V getState(RelationType<V> rConfigType)
+	public <V> V getState(RelationType<V> rStateType)
 	{
-		return getState(rConfigType, null);
+		return getState(rStateType, null);
 	}
 
 	/***************************************
@@ -386,27 +386,27 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 * scope. To the a runtime state value the respective relation needs to be
 	 * set on the appropriate stage (coroutine, continuation, scope).
 	 *
-	 * @param  rConfigType The state relation type
-	 * @param  rDefault    The default value if no state relation exists
+	 * @param  rStateType The state relation type
+	 * @param  rDefault   The default value if no state relation exists
 	 *
 	 * @return The runtime state value (may be null)
 	 */
-	public <V> V getState(RelationType<V> rConfigType, V rDefault)
+	public <V> V getState(RelationType<V> rStateType, V rDefault)
 	{
 		Coroutine<?, ?> rCoroutine = getCurrentCoroutine();
 		V			    rValue     = rDefault;
 
-		if (rCoroutine.hasRelation(rConfigType))
+		if (rCoroutine.hasRelation(rStateType))
 		{
-			rValue = rCoroutine.get(rConfigType);
+			rValue = rCoroutine.get(rStateType);
 		}
-		else if (hasRelation(rConfigType))
+		else if (hasRelation(rStateType))
 		{
-			rValue = get(rConfigType);
+			rValue = get(rStateType);
 		}
-		else if (rScope.hasRelation(rConfigType))
+		else if (rScope.hasRelation(rStateType))
 		{
-			rValue = rScope.get(rConfigType);
+			rValue = rScope.get(rStateType);
 		}
 
 		return rValue;
@@ -638,7 +638,8 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 	/***************************************
 	 * Removes a subroutine from the coroutines stack when it has finished
-	 * execution.
+	 * execution. This will also close all managed resources stored in the
+	 * coroutine.
 	 */
 	void subroutineFinished()
 	{

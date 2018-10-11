@@ -16,13 +16,27 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine.step.nio;
 
+import de.esoco.coroutine.Continuation;
+import de.esoco.coroutine.CoroutineContext;
+import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspension;
+
+import java.io.IOException;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousChannel;
+import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.CompletionHandler;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+
+import org.obrel.core.RelationType;
+import org.obrel.core.RelationTypes;
+
+import static org.obrel.core.RelationTypes.newType;
 
 
 /********************************************************************
@@ -49,6 +63,61 @@ public abstract class AsynchronousChannelStep<I, O> extends CoroutineStep<I, O>
 
 	/** Internal signal for the first operation after a connect. */
 	static final int FIRST_OPERATION = -2;
+
+	/**
+	 * State: the {@link AsynchronousChannelGroup} to associate any new
+	 * asynchronous channels with.
+	 */
+	public static final RelationType<AsynchronousChannelGroup> CHANNEL_GROUP =
+		newType();
+
+	static
+	{
+		RelationTypes.init(AsynchronousSocketStep.class);
+	}
+
+	//~ Methods ----------------------------------------------------------------
+
+	/***************************************
+	 * Returns the {@link AsynchronousChannelGroup} for asynchronous channel
+	 * operations in the current scope. If no such group exists a new one will
+	 * be created with the {@link ExecutorService} of the {@link
+	 * CoroutineContext} and stored as {@link #CHANNEL_GROUP} in the current
+	 * scope.
+	 *
+	 * @param  rContinuation The channel group
+	 *
+	 * @return The channel group
+	 */
+	protected AsynchronousChannelGroup getChannelGroup(
+		Continuation<?> rContinuation)
+	{
+		AsynchronousChannelGroup rChannelGroup =
+			rContinuation.getState(CHANNEL_GROUP);
+
+		if (rChannelGroup == null)
+		{
+			Executor rContextExecutor = rContinuation.context().getExecutor();
+
+			if (rContextExecutor instanceof ExecutorService)
+			{
+				try
+				{
+					rChannelGroup =
+						AsynchronousChannelGroup.withThreadPool(
+							(ExecutorService) rContextExecutor);
+				}
+				catch (IOException e)
+				{
+					throw new CoroutineException(e);
+				}
+
+				rContinuation.scope().set(CHANNEL_GROUP, rChannelGroup);
+			}
+		}
+
+		return rChannelGroup;
+	}
 
 	//~ Inner Interfaces -------------------------------------------------------
 

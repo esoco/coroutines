@@ -191,13 +191,15 @@ public abstract class AsynchronousSocketStep
 	/***************************************
 	 * Returns the channel to be used by this step. This first checks the
 	 * currently exexcuting coroutine in the continuation parameter for an
-	 * existing {@link #SOCKET_CHANNEL} relation. If that doesn't exists or if
-	 * it contains a closed channel a new {@link AsynchronousSocketChannel} will
-	 * be opened and stored in the state object.
+	 * existing {@link #SOCKET_CHANNEL} relation. If that doesn't exists or the
+	 * channel is closed a new {@link AsynchronousSocketChannel} will be opened
+	 * and stored in the coroutine relation. Using the coroutine to store the
+	 * socket allows coroutines to be structured so that multiple subroutines
+	 * perform communication on different sockets.
 	 *
 	 * @param  rContinuation The continuation to query for an existing channel
 	 *
-	 * @return The channel
+	 * @return The socket channel
 	 *
 	 * @throws IOException If opening the channel fails
 	 */
@@ -210,7 +212,8 @@ public abstract class AsynchronousSocketStep
 
 		if (rChannel == null || !rChannel.isOpen())
 		{
-			rChannel = AsynchronousSocketChannel.open();
+			rChannel =
+				AsynchronousSocketChannel.open(getChannelGroup(rContinuation));
 			rCoroutine.set(SOCKET_CHANNEL, rChannel).annotate(MANAGED);
 		}
 

@@ -188,7 +188,9 @@ public class ServerSocketAccept extends AsynchronousChannelStep<Void, Void>
 
 		if (rChannel == null || !rChannel.isOpen())
 		{
-			rChannel = AsynchronousServerSocketChannel.open();
+			rChannel =
+				AsynchronousServerSocketChannel.open(
+					getChannelGroup(rContinuation));
 			rCoroutine.set(SERVER_SOCKET_CHANNEL, rChannel)
 					  .annotate(MetaTypes.MANAGED);
 		}
