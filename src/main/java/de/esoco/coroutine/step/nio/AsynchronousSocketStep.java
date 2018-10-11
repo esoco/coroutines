@@ -19,6 +19,7 @@ package de.esoco.coroutine.step.nio;
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineException;
+import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspension;
 
@@ -40,15 +41,22 @@ import org.obrel.core.RelationTypes;
 import org.obrel.type.MetaTypes;
 
 import static org.obrel.core.RelationTypes.newType;
+import static org.obrel.type.MetaTypes.MANAGED;
 
 
 /********************************************************************
  * The base class for coroutine steps that perform communication through
- * instances of {@link AsynchronousSocketChannel}.
+ * instances of {@link AsynchronousSocketChannel}. The channel will be opened
+ * and connected as necessary. It may also be provided before the step is
+ * invoked in a state relation with the type {@link #SOCKET_CHANNEL}. If the
+ * channel is opened by this step it will have the {@link MetaTypes#MANAGED}
+ * flag so that it will be automatically closed when the {@link CoroutineScope}
+ * finishes.
  *
  * @author eso
  */
-public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
+public abstract class AsynchronousSocketStep
+	extends AsynchronousChannelStep<ByteBuffer, ByteBuffer>
 {
 	//~ Static fields/initializers ---------------------------------------------
 
@@ -71,10 +79,10 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance that connects to the socket the address of which
-	 * is provided by the given factory. The factory may return NULL if the step
-	 * is intended to connect to a channel that has been connected by a previous
-	 * coroutine step.
+	 * Creates a new instance that connects to the socket with the address
+	 * provided by the given factory. The factory may return NULL if the step
+	 * should connect to a channel that is stored in a state relation with the
+	 * type {@link #SOCKET_CHANNEL}.
 	 *
 	 * @param fGetSocketAddress A function that provides the socket address to
 	 *                          connect to from the current continuation
@@ -140,14 +148,15 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 	{
 		try
 		{
-			AsynchronousSocketChannel aChannel = getChannel(rContinuation);
+			AsynchronousSocketChannel rChannel =
+				getSocketChannel(rContinuation);
 
-			if (aChannel.getRemoteAddress() == null)
+			if (rChannel.getRemoteAddress() == null)
 			{
-				aChannel.connect(getSocketAddress(rContinuation)).get();
+				rChannel.connect(getSocketAddress(rContinuation)).get();
 			}
 
-			performBlockingOperation(aChannel, rData);
+			performBlockingOperation(rChannel, rData);
 		}
 		catch (Exception e)
 		{
@@ -155,36 +164,6 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 		}
 
 		return rData;
-	}
-
-	/***************************************
-	 * Returns the channel to be used by this step. This first checks the
-	 * currently exexcuting coroutine in the continuation parameter for an
-	 * existing {@link #SOCKET_CHANNEL} relation. If that doesn't exists or if
-	 * it contains a closed channel a new {@link AsynchronousSocketChannel} will
-	 * be opened and stored in the state object.
-	 *
-	 * @param  rContinuation The continuation to query for an existing channel
-	 *
-	 * @return The channel
-	 *
-	 * @throws IOException If opening the channel fails
-	 */
-	protected AsynchronousSocketChannel getChannel(
-		Continuation<?> rContinuation) throws IOException
-	{
-		Coroutine<?, ?> rCoroutine = rContinuation.getCurrentCoroutine();
-
-		AsynchronousSocketChannel rChannel = rCoroutine.get(SOCKET_CHANNEL);
-
-		if (rChannel == null || !rChannel.isOpen())
-		{
-			rChannel = AsynchronousSocketChannel.open();
-			rCoroutine.set(SOCKET_CHANNEL, rChannel)
-					  .annotate(MetaTypes.MANAGED);
-		}
-
-		return rChannel;
 	}
 
 	/***************************************
@@ -210,6 +189,35 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 	}
 
 	/***************************************
+	 * Returns the channel to be used by this step. This first checks the
+	 * currently exexcuting coroutine in the continuation parameter for an
+	 * existing {@link #SOCKET_CHANNEL} relation. If that doesn't exists or if
+	 * it contains a closed channel a new {@link AsynchronousSocketChannel} will
+	 * be opened and stored in the state object.
+	 *
+	 * @param  rContinuation The continuation to query for an existing channel
+	 *
+	 * @return The channel
+	 *
+	 * @throws IOException If opening the channel fails
+	 */
+	protected AsynchronousSocketChannel getSocketChannel(
+		Continuation<?> rContinuation) throws IOException
+	{
+		Coroutine<?, ?> rCoroutine = rContinuation.getCurrentCoroutine();
+
+		AsynchronousSocketChannel rChannel = rCoroutine.get(SOCKET_CHANNEL);
+
+		if (rChannel == null || !rChannel.isOpen())
+		{
+			rChannel = AsynchronousSocketChannel.open();
+			rCoroutine.set(SOCKET_CHANNEL, rChannel).annotate(MANAGED);
+		}
+
+		return rChannel;
+	}
+
+	/***************************************
 	 * Opens and connects a {@link Channel} to the {@link SocketAddress} of this
 	 * step and then performs the channel operation asynchronously.
 	 *
@@ -224,7 +232,7 @@ public abstract class AsynchronousSocketStep extends AsynchronousChannelStep
 		try
 		{
 			AsynchronousSocketChannel rChannel =
-				getChannel(rSuspension.continuation());
+				getSocketChannel(rSuspension.continuation());
 
 			if (rChannel.getRemoteAddress() == null)
 			{

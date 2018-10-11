@@ -43,8 +43,7 @@ import java.nio.channels.CompletionHandler;
  *
  * @author eso
  */
-public abstract class AsynchronousChannelStep
-	extends CoroutineStep<ByteBuffer, ByteBuffer>
+public abstract class AsynchronousChannelStep<I, O> extends CoroutineStep<I, O>
 {
 	//~ Static fields/initializers ---------------------------------------------
 
@@ -132,6 +131,7 @@ public abstract class AsynchronousChannelStep
 		@SuppressWarnings("unchecked")
 		public void completed(V rResult, ByteBuffer rData)
 		{
+			// first invocation from connect is Void, then read/write integers
 			int nProcessed =
 				rResult instanceof Integer ? ((Integer) rResult).intValue()
 										   : FIRST_OPERATION;

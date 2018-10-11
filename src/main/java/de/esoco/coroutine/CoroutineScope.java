@@ -24,6 +24,8 @@ import java.util.LinkedHashSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.obrel.type.MetaTypes;
+
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.Coroutines.closeManagedResources;
 
@@ -34,6 +36,10 @@ import static de.esoco.coroutine.Coroutines.closeManagedResources;
  * receives an instance of the functional interface {@link ScopeCode} and blocks
  * the invoking thread until all started coroutines have finished execution
  * (either successfully or with an exception).
+ *
+ * <p>The scope will also automatically close all ({@link AutoCloseable})
+ * resources that are stored in this scope in relations with the annotation
+ * {@link MetaTypes#MANAGED}.</p>
  *
  * @author eso
  */
