@@ -102,7 +102,7 @@ public class CodeExecution<I, O> extends CoroutineStep<I, O>
 	 */
 	public static <T> CodeExecution<T, Void> consume(Consumer<T> fCode)
 	{
-		return new CodeExecution<>(Functions.consume(fCode));
+		return new CodeExecution<>(Functions.asFunction(fCode));
 	}
 
 	/***************************************
@@ -115,7 +115,7 @@ public class CodeExecution<I, O> extends CoroutineStep<I, O>
 	 */
 	public static <T> CodeExecution<T, Void> run(Runnable fCode)
 	{
-		return new CodeExecution<>(Functions.run(fCode));
+		return new CodeExecution<>(Functions.asFunction(fCode));
 	}
 
 	/***************************************
@@ -128,7 +128,7 @@ public class CodeExecution<I, O> extends CoroutineStep<I, O>
 	 */
 	public static <I, O> CodeExecution<I, O> supply(Supplier<O> fCode)
 	{
-		return new CodeExecution<>(Functions.supply(fCode));
+		return new CodeExecution<>(Functions.asFunction(fCode));
 	}
 
 	//~ Methods ----------------------------------------------------------------
