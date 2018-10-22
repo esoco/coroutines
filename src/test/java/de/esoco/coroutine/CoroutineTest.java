@@ -16,6 +16,7 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
+import de.esoco.coroutine.CoroutineScope.ScopeFuture;
 import de.esoco.coroutine.step.Condition;
 import de.esoco.coroutine.step.Iteration;
 import de.esoco.coroutine.step.Loop;
@@ -29,13 +30,17 @@ import java.util.concurrent.CancellationException;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import org.obrel.type.StandardTypes;
+
 import static de.esoco.coroutine.ChannelId.stringChannel;
 import static de.esoco.coroutine.CoroutineScope.launch;
+import static de.esoco.coroutine.CoroutineScope.produce;
 import static de.esoco.coroutine.Coroutines.COROUTINE_LISTENERS;
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
 import static de.esoco.coroutine.step.ChannelReceive.receive;
 import static de.esoco.coroutine.step.CodeExecution.apply;
 import static de.esoco.coroutine.step.CodeExecution.run;
+import static de.esoco.coroutine.step.CodeExecution.setScopeParameter;
 import static de.esoco.coroutine.step.CodeExecution.supply;
 import static de.esoco.coroutine.step.Condition.doIf;
 import static de.esoco.coroutine.step.Condition.doIfElse;
@@ -45,6 +50,8 @@ import static de.esoco.coroutine.step.Loop.loopWhile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
+import static org.obrel.type.StandardTypes.TEXT;
 
 
 /********************************************************************
@@ -289,13 +296,32 @@ public class CoroutineTest
 			run ->
 			{
 				Continuation<Integer> ca = run.async(CONVERT_INT, "test1234");
-				Continuation<Integer> cb = run.blocking(CONVERT_INT, "test1234");
+				Continuation<Integer> cb =
+					run.blocking(CONVERT_INT, "test1234");
 
 				assertEquals(Integer.valueOf(12345), ca.getResult());
 				assertEquals(Integer.valueOf(12345), cb.getResult());
 				assertTrue(ca.isFinished());
 				assertTrue(cb.isFinished());
 			});
+	}
+
+	/***************************************
+	 * Test of {@link CoroutineScope#produce(org.obrel.core.RelationType,
+	 * de.esoco.coroutine.CoroutineScope.ScopeCode)}.
+	 */
+	@Test
+	public void testProduce()
+	{
+		Coroutine<String, String> cr =
+			Coroutine.first(apply((String s) -> s.toUpperCase()))
+					 .then(setScopeParameter(TEXT));
+
+		ScopeFuture<String> result =
+			produce(StandardTypes.TEXT, run -> run.async(cr, "test"));
+
+		assertEquals("TEST", result.get());
+		assertTrue(result.isDone());
 	}
 
 	/***************************************

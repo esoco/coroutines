@@ -21,9 +21,13 @@ import de.esoco.lib.concurrent.RunLock;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.obrel.core.RelationType;
 import org.obrel.type.MetaTypes;
 
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
@@ -72,12 +76,14 @@ public class CoroutineScope extends CoroutineEnvironment
 	{
 		this.rContext =
 			rContext != null ? rContext : Coroutines.getDefaultContext();
+
+		this.rContext.scopeLaunched(this);
 	}
 
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Creates a new scope for the launching of coroutines in the {@link
+	 * Launches a new scope for the execution of coroutine in the {@link
 	 * Coroutines#getDefaultContext() default context}.
 	 *
 	 * @param rCode The code to execute in the scope
@@ -90,9 +96,10 @@ public class CoroutineScope extends CoroutineEnvironment
 	}
 
 	/***************************************
-	 * Creates a new scope for the launching of coroutine executions in a
-	 * specific context. This method will block the invoking thread until all
-	 * coroutines launched by the argument builder have terminated.
+	 * Launches a new scope for the execution of coroutine in a specific
+	 * context. This method will block the invoking thread until all coroutines
+	 * launched by the argument builder have terminated, either successfully, by
+	 * cancelation, or with errors.
 	 *
 	 * <p>If one or more of the coroutines or the scope code throw an exception
 	 * this method will throw a {@link CoroutineScopeException} as soon as all
@@ -111,59 +118,63 @@ public class CoroutineScope extends CoroutineEnvironment
 	{
 		CoroutineScope aScope = new CoroutineScope(rContext);
 
-		aScope.context().scopeLaunched(aScope);
-
 		try
 		{
 			rCode.runIn(aScope);
+			aScope.await();
 		}
 		catch (Exception e)
 		{
+			// even on errors wait for all asynchronous invocations
+			// in the scope to finish
+			aScope.await();
 			throw new CoroutineScopeException(e, aScope.aFailedContinuations);
 		}
-		finally
-		{
-			// even on errors wait for all asynchronous invocations
-			// and finish the scope
-			aScope.await();
-			aScope.context().scopeFinished(aScope);
-			closeManagedResources(aScope, aScope.get(EXCEPTION_HANDLER));
-		}
 
-		handleErrors(aScope.aFailedContinuations);
+		aScope.checkThrowErrors();
 	}
 
 	/***************************************
-	 * Handles errors that occurred during the coroutine executions in a scope.
+	 * Launches a new scope that is expected to produce a result in the {@link
+	 * Coroutines#getDefaultContext() default context}.
 	 *
-	 * @param rFailedContinuations A collection of failed continuations (can be
-	 *                             empty)
+	 * @param rResultType The relation type to query the produced result with or
+	 *                    NULL to always return NULL as the result
+	 * @param rCode       The producing code to execute in the scope
+	 *
+	 * @see   #produce(CoroutineContext, RelationType, ScopeCode)
 	 */
-	private static void handleErrors(
-		Collection<Continuation<?>> rFailedContinuations)
+	public static <T> ScopeFuture<T> produce(
+		RelationType<T> rResultType,
+		ScopeCode		rCode)
 	{
-		if (rFailedContinuations.size() > 0)
-		{
-			if (rFailedContinuations.size() == 1)
-			{
-				Throwable eError =
-					CollectionUtil.firstElementOf(rFailedContinuations)
-								  .getError();
+		return produce(null, rResultType, rCode);
+	}
 
-				if (eError instanceof CoroutineException)
-				{
-					throw (CoroutineException) eError;
-				}
-				else
-				{
-					throw new CoroutineScopeException(rFailedContinuations);
-				}
-			}
-			else
-			{
-				throw new CoroutineScopeException(rFailedContinuations);
-			}
-		}
+	/***************************************
+	 * Launches a new scope that is expected to produce a result and returns a
+	 * {@link Future} instance that can be used to query the result. The result
+	 * must be stored by the scope code in a relation of the scope with the
+	 * given relation type. If only a future object is needed to manage a scope
+	 * execution the relation type can be NULL, in which case the future result
+	 * will also be NULL.
+	 *
+	 * @param  rContext    The coroutine context for the scope
+	 * @param  rResultType The relation type to query the produced result with
+	 *                     or NULL to always return NULL as the result
+	 * @param  rCode       The producing code to execute in the scope
+	 *
+	 * @return A future that provides access to the result of the scope
+	 *         execution
+	 */
+	public static <T> ScopeFuture<T> produce(CoroutineContext rContext,
+											 RelationType<T>  rResultType,
+											 ScopeCode		  rCode)
+	{
+		return new ScopeFuture<>(
+			new CoroutineScope(rContext),
+			rCode,
+			rResultType);
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -196,9 +207,9 @@ public class CoroutineScope extends CoroutineEnvironment
 	}
 
 	/***************************************
-	 * Blocks until the coroutines of all {@link CoroutineScope scopes} in this
-	 * context have finished execution. If no coroutines are running or all have
-	 * finished execution already this method returns immediately.
+	 * Blocks until all coroutines in this scope have finished execution. If no
+	 * coroutines are running or all have finished execution already this method
+	 * returns immediately.
 	 */
 	public void await()
 	{
@@ -210,6 +221,44 @@ public class CoroutineScope extends CoroutineEnvironment
 		{
 			throw new CoroutineException(e);
 		}
+		finally
+		{
+			rContext.scopeFinished(this);
+			closeManagedResources(this, get(EXCEPTION_HANDLER));
+		}
+	}
+
+	/***************************************
+	 * Blocks until all coroutines in this scope have finished execution or a
+	 * timeout expires. If the timeout is reached this method will return but
+	 * the scope will continue to execute. If necessary it can be cancelled by
+	 * calling {@link #cancel()}.
+	 *
+	 * @param  nTimeout The maximum time to wait
+	 * @param  eUnit    The unit of the timeout
+	 *
+	 * @return TRUE if the scope has finished execution; FALSE if the timeout
+	 *         was reached
+	 */
+	public boolean await(long nTimeout, TimeUnit eUnit)
+	{
+		boolean bCompleted;
+
+		try
+		{
+			bCompleted = aFinishSignal.await(nTimeout, eUnit);
+		}
+		catch (InterruptedException e)
+		{
+			throw new CoroutineException(e);
+		}
+		finally
+		{
+			rContext.scopeFinished(this);
+			closeManagedResources(this, get(EXCEPTION_HANDLER));
+		}
+
+		return bCompleted;
 	}
 
 	/***************************************
@@ -248,6 +297,8 @@ public class CoroutineScope extends CoroutineEnvironment
 	{
 		aScopeLock.runLocked(
 			() ->
+		{
+			if (!isFinished())
 			{
 				bCancelled = true;
 
@@ -257,7 +308,8 @@ public class CoroutineScope extends CoroutineEnvironment
 				}
 
 				aSuspensions.clear();
-			});
+			}
+		});
 	}
 
 	/***************************************
@@ -419,6 +471,36 @@ public class CoroutineScope extends CoroutineEnvironment
 	}
 
 	/***************************************
+	 * Throws an exception if errors occurred during the coroutine executions in
+	 * this scope.
+	 */
+	void checkThrowErrors()
+	{
+		if (aFailedContinuations.size() > 0)
+		{
+			if (aFailedContinuations.size() == 1)
+			{
+				Throwable eError =
+					CollectionUtil.firstElementOf(aFailedContinuations)
+								  .getError();
+
+				if (eError instanceof CoroutineException)
+				{
+					throw (CoroutineException) eError;
+				}
+				else
+				{
+					throw new CoroutineScopeException(aFailedContinuations);
+				}
+			}
+			else
+			{
+				throw new CoroutineScopeException(aFailedContinuations);
+			}
+		}
+	}
+
+	/***************************************
 	 * Removes a continuation from the list of failed continuations to prevent
 	 * an error exception upon completion.
 	 *
@@ -503,7 +585,7 @@ public class CoroutineScope extends CoroutineEnvironment
 	/********************************************************************
 	 * A functional interface that will be executed in a scope that has been
 	 * launched with {@link CoroutineScope#launch(ScopeCode)}. It is typically
-	 * used in form of a lambda expression or method reference.
+	 * used in the form of a lambda expression or method reference.
 	 *
 	 * @author eso
 	 */
@@ -524,5 +606,132 @@ public class CoroutineScope extends CoroutineEnvironment
 		 *                   will be handled by the scope
 		 */
 		public void runIn(CoroutineScope rScope) throws Exception;
+	}
+
+	//~ Inner Classes ----------------------------------------------------------
+
+	/********************************************************************
+	 * An implementation of the future interface that wraps a scope execution.
+	 *
+	 * @author eso
+	 */
+	public static class ScopeFuture<T> implements Future<T>
+	{
+		//~ Instance fields ----------------------------------------------------
+
+		private CoroutineScope  rScope;
+		private RelationType<T> rResultType;
+
+		private Exception eScopeCodeError;
+
+		//~ Constructors -------------------------------------------------------
+
+		/***************************************
+		 * Creates a new instance for a certain scope.
+		 *
+		 * @param rScope      The scope to await for the result
+		 * @param rCode       The code to be executed in the scope
+		 * @param rResultType A relation type to query the result with after the
+		 *                    scope has finished
+		 */
+		public ScopeFuture(CoroutineScope  rScope,
+						   ScopeCode	   rCode,
+						   RelationType<T> rResultType)
+		{
+			this.rScope		 = rScope;
+			this.rResultType = rResultType;
+
+			try
+			{
+				rCode.runIn(rScope);
+			}
+			catch (Exception e)
+			{
+				eScopeCodeError = e;
+			}
+		}
+
+		//~ Methods ------------------------------------------------------------
+
+		/***************************************
+		 * {@inheritDoc}
+		 */
+		@Override
+		public boolean cancel(boolean rMayInterruptIfRunning)
+		{
+			boolean bTerminated = rScope.isFinished() || rScope.isCancelled();
+
+			if (!bTerminated)
+			{
+				rScope.cancel();
+				bTerminated = true;
+			}
+
+			return bTerminated;
+		}
+
+		/***************************************
+		 * {@inheritDoc}
+		 */
+		@Override
+		public T get()
+		{
+			rScope.await();
+
+			return getImpl();
+		}
+
+		/***************************************
+		 * {@inheritDoc}
+		 */
+		@Override
+		public T get(long nTimeout, TimeUnit eUnit)
+		{
+			rScope.await(nTimeout, eUnit);
+
+			return getImpl();
+		}
+
+		/***************************************
+		 * {@inheritDoc}
+		 */
+		@Override
+		public boolean isCancelled()
+		{
+			return rScope.isCancelled();
+		}
+
+		/***************************************
+		 * {@inheritDoc}
+		 */
+		@Override
+		public boolean isDone()
+		{
+			return rScope.isFinished();
+		}
+
+		/***************************************
+		 * Implements getting the scope result (without awaiting).
+		 *
+		 * @return The scope result
+		 */
+		private T getImpl()
+		{
+			if (eScopeCodeError != null)
+			{
+				throw new CoroutineScopeException(
+					eScopeCodeError,
+					rScope.aFailedContinuations);
+			}
+
+			rScope.checkThrowErrors();
+
+			if (isCancelled())
+			{
+				throw new CancellationException("Scope is cancelled");
+			}
+
+			return rResultType != null ? rScope.get(rResultType) : null;
+		}
 	}
 }

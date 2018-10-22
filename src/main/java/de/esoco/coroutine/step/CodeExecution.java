@@ -1,5 +1,5 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// This file is a part of the 'esoco-lib' project.
+// This file is a part of the 'coroutines' project.
 // Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,14 +17,19 @@
 package de.esoco.coroutine.step;
 
 import de.esoco.coroutine.Continuation;
+import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
+
 import de.esoco.lib.expression.Functions;
 
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import org.obrel.core.RelationType;
 
 
 /********************************************************************
@@ -106,6 +111,47 @@ public class CodeExecution<I, O> extends CoroutineStep<I, O>
 	}
 
 	/***************************************
+	 * Consumes the input value with a {@link Consumer} and creates no result.
+	 *
+	 * @param  fCode The consumer to be executed
+	 *
+	 * @return A new instance of this class
+	 */
+	public static <T> CodeExecution<T, Void> consume(
+		BiConsumer<T, Continuation<?>> fCode)
+	{
+		return new CodeExecution<>(Functions.asFunction(fCode));
+	}
+
+	/***************************************
+	 * Queries a parameter relation from the {@link Continuation} and returns it
+	 * as the result of the execution.
+	 *
+	 * @param  rSource The relation type of the parameter
+	 *
+	 * @return A new instance of this class
+	 */
+	public static <I, O> CodeExecution<I, O> getParameter(
+		RelationType<O> rSource)
+	{
+		return supply(c -> c.get(rSource));
+	}
+
+	/***************************************
+	 * Queries a parameter relation from the {@link CoroutineScope} and returns
+	 * it as the result of the execution.
+	 *
+	 * @param  rSource The relation type of the parameter
+	 *
+	 * @return A new instance of this class
+	 */
+	public static <I, O> CodeExecution<I, O> getScopeParameter(
+		RelationType<O> rSource)
+	{
+		return supply(c -> c.scope().get(rSource));
+	}
+
+	/***************************************
 	 * Executes a {@link Runnable}, ignoring any input value and returning no
 	 * result.
 	 *
@@ -119,6 +165,61 @@ public class CodeExecution<I, O> extends CoroutineStep<I, O>
 	}
 
 	/***************************************
+	 * Executes a {@link Runnable}, ignoring any input value and returning no
+	 * result.
+	 *
+	 * @param  fCode The runnable to be executed
+	 *
+	 * @return A new instance of this class
+	 */
+	public static <T> CodeExecution<T, T> run(Consumer<Continuation<?>> fCode)
+	{
+		return new CodeExecution<>((v, c) ->
+		{
+			fCode.accept(c);
+
+			return v;
+		});
+	}
+
+	/***************************************
+	 * Sets the input value into a parameter of the {@link Continuation} and
+	 * then returns it.
+	 *
+	 * @param  rTarget The type of the relation to set the parameter in
+	 *
+	 * @return A new instance of this class
+	 */
+	public static <T> CodeExecution<T, T> setParameter(RelationType<T> rTarget)
+	{
+		return apply((v, c) ->
+		{
+			c.set(rTarget, v);
+
+			return v;
+		});
+	}
+
+	/***************************************
+	 * Sets the input value into a parameter of the {@link CoroutineScope} and
+	 * then returns it.
+	 *
+	 * @param  rTarget The type of the relation to set the parameter in
+	 *
+	 * @return A new instance of this class
+	 */
+	public static <T> CodeExecution<T, T> setScopeParameter(
+		RelationType<T> rTarget)
+	{
+		return apply((v, c) ->
+		{
+			c.scope().set(rTarget, v);
+
+			return v;
+		});
+	}
+
+	/***************************************
 	 * Provides a value from a {@link Supplier} as the result, ignoring any
 	 * input value.
 	 *
@@ -129,6 +230,20 @@ public class CodeExecution<I, O> extends CoroutineStep<I, O>
 	public static <I, O> CodeExecution<I, O> supply(Supplier<O> fCode)
 	{
 		return new CodeExecution<>(Functions.asFunction(fCode));
+	}
+
+	/***************************************
+	 * Provides a value from a {@link Supplier} as the result, ignoring any
+	 * input value.
+	 *
+	 * @param  fCode The supplier to be executed
+	 *
+	 * @return A new instance of this class
+	 */
+	public static <I, O> CodeExecution<I, O> supply(
+		Function<Continuation<?>, O> fCode)
+	{
+		return new CodeExecution<>((v, c) -> fCode.apply(c));
 	}
 
 	//~ Methods ----------------------------------------------------------------
