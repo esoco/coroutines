@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -116,16 +117,34 @@ public class Continuation<T> extends RelatedObject implements Executor
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
-	 * Awaits the completion of this continuation. This is just a semantic
-	 * variant of {@link #getResult()} which ignores the result value.
-	 *
-	 * @return This instance to allow further invocations
+	 * Awaits the completion of this continuation. This is basically a variant
+	 * of {@link #getResult()} which ignores the result value.
 	 */
-	public Continuation<T> await()
+	public void await()
 	{
 		getResult();
+	}
 
-		return this;
+	/***************************************
+	 * Awaits the completion of this continuation but only until a timeout is
+	 * reached. If the timeout is reached before completion the returned value
+	 * will be FALSE.
+	 *
+	 * @param  nTimeout The timeout value
+	 * @param  eUnit    The time unit of the the timeout
+	 *
+	 * @return TRUE if the coroutine has finished, FALSE if the timeout elapsed
+	 */
+	public boolean await(long nTimeout, TimeUnit eUnit)
+	{
+		try
+		{
+			return aFinishSignal.await(nTimeout, eUnit);
+		}
+		catch (InterruptedException e)
+		{
+			throw new CoroutineException(e);
+		}
 	}
 
 	/***************************************
@@ -329,7 +348,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
-	 * Reurn the result of the coroutine execution. If this continuation has
+	 * Return the result of the coroutine execution. If this continuation has
 	 * been cancelled a {@link CancellationException} will be thrown. If it has
 	 * failed with an error a {@link CoroutineException} will be thrown.
 	 *
@@ -340,32 +359,45 @@ public class Continuation<T> extends RelatedObject implements Executor
 		try
 		{
 			aFinishSignal.await();
-
-			if (bCancelled)
-			{
-				if (eError != null)
-				{
-					if (eError instanceof CoroutineException)
-					{
-						throw (CoroutineException) eError;
-					}
-					else
-					{
-						throw new CoroutineException(eError);
-					}
-				}
-				else
-				{
-					throw new CancellationException();
-				}
-			}
-
-			return rResult;
 		}
 		catch (InterruptedException e)
 		{
 			throw new CoroutineException(e);
 		}
+
+		return getResultImpl();
+	}
+
+	/***************************************
+	 * Return the result of the coroutine execution or throws a {@link
+	 * CoroutineException} if a timeout is reached. If this continuation has
+	 * been cancelled a {@link CancellationException} will be thrown. If it has
+	 * failed with an error a {@link CoroutineException} will be thrown.
+	 *
+	 * @param  nTimeout The timeout value
+	 * @param  eUnit    The time unit of the the timeout
+	 *
+	 * @return The result The result of the execution
+	 *
+	 * @throws CoroutineException    If the timeout has elapsed before finishing
+	 *                               or an error occurred
+	 * @throws CancellationException If the coroutine had been cancelled
+	 */
+	public T getResult(long nTimeout, TimeUnit eUnit)
+	{
+		try
+		{
+			if (!aFinishSignal.await(nTimeout, eUnit))
+			{
+				throw new CoroutineException("Timeout reached");
+			}
+		}
+		catch (InterruptedException e)
+		{
+			throw new CoroutineException(e);
+		}
+
+		return getResultImpl();
 	}
 
 	/***************************************
@@ -693,6 +725,35 @@ public class Continuation<T> extends RelatedObject implements Executor
 		{
 			fStepListener.accept(rStep, this);
 		}
+	}
+
+	/***************************************
+	 * Internal implementation of querying the the result.
+	 *
+	 * @return The result
+	 */
+	private T getResultImpl()
+	{
+		if (bCancelled)
+		{
+			if (eError != null)
+			{
+				if (eError instanceof CoroutineException)
+				{
+					throw (CoroutineException) eError;
+				}
+				else
+				{
+					throw new CoroutineException(eError);
+				}
+			}
+			else
+			{
+				throw new CancellationException();
+			}
+		}
+
+		return rResult;
 	}
 
 	/***************************************
