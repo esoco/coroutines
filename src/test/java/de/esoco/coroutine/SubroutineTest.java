@@ -51,10 +51,10 @@ public class SubroutineTest
 					 .then(apply(i -> i + 10));
 
 		launch(
-			run ->
+			scope ->
 			{
-				Continuation<Integer> ca = run.async(cr, "test1234");
-				Continuation<Integer> cb = run.blocking(cr, "test1234");
+				Continuation<Integer> ca = cr.runAsync(scope, "test1234");
+				Continuation<Integer> cb = cr.runBlocking(scope, "test1234");
 
 				assertEquals(Integer.valueOf(12355), ca.getResult());
 				assertEquals(Integer.valueOf(12355), cb.getResult());
@@ -78,18 +78,18 @@ public class SubroutineTest
 							supply(() -> "TRUE")))));
 
 		launch(
-			run ->
+			scope ->
 			{
-				Continuation<String> ca = run.async(cr, false);
-				Continuation<String> cb = run.blocking(cr, false);
+				Continuation<String> ca = cr.runAsync(scope, false);
+				Continuation<String> cb = cr.runBlocking(scope, false);
 
 				assertEquals(null, ca.getResult());
 				assertEquals(null, cb.getResult());
 				assertTrue(ca.isFinished());
 				assertTrue(cb.isFinished());
 
-				ca = run.async(cr, true);
-				cb = run.blocking(cr, true);
+				ca = cr.runAsync(scope, true);
+				cb = cr.runBlocking(scope, true);
 
 				assertEquals("TRUE", ca.getResult());
 				assertEquals("TRUE", cb.getResult());

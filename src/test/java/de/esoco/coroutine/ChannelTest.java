@@ -79,13 +79,13 @@ public class ChannelTest
 			RECEIVE.then(apply((String s) -> s.toLowerCase()));
 
 		launch(
-			run ->
+			scope ->
 			{
-				Continuation<String> r1 = run.async(RECEIVE);
-				Continuation<String> r2 = run.async(receive2);
+				Continuation<String> r1 = RECEIVE.runAsync(scope);
+				Continuation<String> r2 = receive2.runAsync(scope);
 
-				Continuation<?> s1 = run.async(SEND, "123");
-				Continuation<?> s2 = run.async(SEND, "456");
+				Continuation<?> s1 = SEND.runAsync(scope, "123");
+				Continuation<?> s2 = SEND.runAsync(scope, "456");
 
 				assertEquals("123test", s1.getResult());
 				assertEquals("456test", s2.getResult());
@@ -115,13 +115,13 @@ public class ChannelTest
 	public void testChannelClose()
 	{
 		launch(
-			run ->
+			scope ->
 			{
 				Continuation<String> r = null;
 
 				try
 				{
-					r = run.async(RECEIVE);
+					r = RECEIVE.runAsync(scope);
 
 					r.getChannel(TEST_CHANNEL).close();
 					r.await();
@@ -135,14 +135,14 @@ public class ChannelTest
 			});
 
 		launch(
-			run ->
+			scope ->
 			{
 				Continuation<String> r = null;
 
 				try
 				{
-					run.getChannel(TEST_CHANNEL).close();
-					r = run.async(SEND, "TEST");
+					scope.getChannel(TEST_CHANNEL).close();
+					r = SEND.runAsync(scope, "TEST");
 
 					r.await();
 					fail();

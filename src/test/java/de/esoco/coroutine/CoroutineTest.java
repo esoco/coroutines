@@ -93,16 +93,16 @@ public class CoroutineTest
 		Coroutine<?, ?> cr = Coroutine.first(receive(ch));
 
 		launch(
-			run ->
+			scope ->
 			{
 				// this will block because the channel is never sent to
-				Continuation<?> ca = run.async(cr);
+				Continuation<?> ca = cr.runAsync(scope);
 
 				// cancel the scope with the suspended receive
-				run.cancel();
+				scope.cancel();
 
 				// await async cancelled receive so that states can be checked
-				run.await();
+				scope.await();
 
 				assertTrue(ca.isCancelled());
 				assertTrue(ca.isFinished());
@@ -126,12 +126,12 @@ public class CoroutineTest
 	public void testCondition()
 	{
 		launch(
-			run ->
+			scope ->
 			{
 				assertBooleanInput(
 					"true",
 					"false",
-					run,
+					scope,
 					Coroutine.first(
 						doIfElse(
 							b -> b,
@@ -141,7 +141,7 @@ public class CoroutineTest
 				assertBooleanInput(
 					"true",
 					"false",
-					run,
+					scope,
 					Coroutine.first(
 						doIf((Boolean b) -> b, supply(() -> "true")).orElse(
 							supply(() -> "false"))));
@@ -149,7 +149,7 @@ public class CoroutineTest
 				assertBooleanInput(
 					"true",
 					"false",
-					run,
+					scope,
 					Coroutine.first(apply((Boolean b) -> b.toString()))
 					.then(apply(s -> Boolean.valueOf(s)))
 					.then(
@@ -161,7 +161,7 @@ public class CoroutineTest
 				assertBooleanInput(
 					"true",
 					"false",
-					run,
+					scope,
 					Coroutine.first(apply((Boolean b) -> b.toString()))
 					.then(apply(s -> Boolean.valueOf(s)))
 					.then(
@@ -171,7 +171,7 @@ public class CoroutineTest
 				assertBooleanInput(
 					"true",
 					null,
-					run,
+					scope,
 					Coroutine.first(doIf(b -> b, supply(() -> "true"))));
 			});
 	}
@@ -188,7 +188,7 @@ public class CoroutineTest
 
 		try
 		{
-			launch(run -> run.blocking(ce));
+			launch(ce::runBlocking);
 			fail();
 		}
 		catch (CoroutineScopeException e)
@@ -198,7 +198,7 @@ public class CoroutineTest
 
 		try
 		{
-			launch(run -> run.async(ce));
+			launch(ce::runAsync);
 			fail();
 		}
 		catch (CoroutineScopeException e)
@@ -219,10 +219,10 @@ public class CoroutineTest
 		 							s.toUpperCase())));
 
 		launch(
-			run ->
+			scope ->
 			{
-				Continuation<?> ca = run.async(cr, "a,b,c,d");
-				Continuation<?> cb = run.blocking(cr, "a,b,c,d");
+				Continuation<?> ca = cr.runAsync(scope, "a,b,c,d");
+				Continuation<?> cb = cr.runBlocking(scope, "a,b,c,d");
 
 				assertEquals(Arrays.asList("A", "B", "C", "D"), ca.getResult());
 				assertEquals(Arrays.asList("A", "B", "C", "D"), cb.getResult());
@@ -245,12 +245,12 @@ public class CoroutineTest
 				  .add(e -> aEvents.add("CTX-" + e.getType()));
 
 		launch(
-			run ->
+			scope ->
 			{
-				run.get(COROUTINE_LISTENERS)
+				scope.get(COROUTINE_LISTENERS)
 				.add(e -> aEvents.add("SCOPE-" + e.getType()));
 
-				Continuation<String> c = run.async(cr, "test");
+				Continuation<String> c = cr.runAsync(scope, "test");
 
 				c.await();
 				assertTrue(c.isFinished());
@@ -274,10 +274,10 @@ public class CoroutineTest
 			Coroutine.first(loopWhile(i -> i < 10, apply(i -> i + 1)));
 
 		launch(
-			run ->
+			scope ->
 			{
-				Continuation<Integer> ca = run.async(cr, 1);
-				Continuation<Integer> cb = run.blocking(cr, 1);
+				Continuation<Integer> ca = cr.runAsync(scope, 1);
+				Continuation<Integer> cb = cr.runBlocking(scope, 1);
 
 				assertEquals(Integer.valueOf(10), ca.getResult());
 				assertEquals(Integer.valueOf(10), cb.getResult());
@@ -293,11 +293,13 @@ public class CoroutineTest
 	public void testMultiStep()
 	{
 		launch(
-			run ->
+			scope ->
 			{
-				Continuation<Integer> ca = run.async(CONVERT_INT, "test1234");
+				Continuation<Integer> ca =
+					CONVERT_INT.runAsync(scope, "test1234");
+
 				Continuation<Integer> cb =
-					run.blocking(CONVERT_INT, "test1234");
+					CONVERT_INT.runBlocking(scope, "test1234");
 
 				assertEquals(Integer.valueOf(12345), ca.getResult());
 				assertEquals(Integer.valueOf(12345), cb.getResult());
@@ -318,7 +320,7 @@ public class CoroutineTest
 					 .then(setScopeParameter(TEXT));
 
 		ScopeFuture<String> result =
-			produce(StandardTypes.TEXT, run -> run.async(cr, "test"));
+			produce(StandardTypes.TEXT, scope -> cr.runAsync(scope, "test"));
 
 		assertEquals("TEST", result.get());
 		assertTrue(result.isDone());
@@ -334,10 +336,10 @@ public class CoroutineTest
 			Coroutine.first(apply((String s) -> s.toUpperCase()));
 
 		launch(
-			run ->
+			scope ->
 			{
-				Continuation<String> ca = run.async(cr, "test");
-				Continuation<String> cb = run.blocking(cr, "test");
+				Continuation<String> ca = cr.runAsync(scope, "test");
+				Continuation<String> cb = cr.runBlocking(scope, "test");
 
 				assertEquals("TEST", ca.getResult());
 				assertEquals("TEST", cb.getResult());
@@ -352,18 +354,18 @@ public class CoroutineTest
 	 *
 	 * @param sTrueResult  The expected result for a TRUE input
 	 * @param sFalseResult The expected result for a FALSE input
-	 * @param run          The coroutine scope
+	 * @param rScope       run The coroutine scope
 	 * @param cr           The coroutine
 	 */
 	void assertBooleanInput(String					   sTrueResult,
 							String					   sFalseResult,
-							CoroutineScope			   run,
+							CoroutineScope			   rScope,
 							Coroutine<Boolean, String> cr)
 	{
-		Continuation<String> cat = run.async(cr, true);
-		Continuation<String> caf = run.async(cr, false);
-		Continuation<String> cbt = run.blocking(cr, true);
-		Continuation<String> cbf = run.blocking(cr, false);
+		Continuation<String> cat = cr.runAsync(rScope, true);
+		Continuation<String> caf = cr.runAsync(rScope, false);
+		Continuation<String> cbt = cr.runBlocking(rScope, true);
+		Continuation<String> cbf = cr.runBlocking(rScope, false);
 
 		assertEquals(sTrueResult, cat.getResult());
 		assertEquals(sTrueResult, cbt.getResult());

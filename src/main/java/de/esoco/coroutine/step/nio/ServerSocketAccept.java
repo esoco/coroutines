@@ -153,8 +153,9 @@ public class ServerSocketAccept extends AsynchronousChannelStep<Void, Void>
 			AsynchronousServerSocketChannel rChannel =
 				getServerSocketChannel(rContinuation);
 
-			rContinuation.scope()
-						 .blocking(rRequestHandler, rChannel.accept().get());
+			rRequestHandler.runBlocking(
+				rContinuation.scope(),
+				rChannel.accept().get());
 		}
 		catch (Exception e)
 		{
@@ -292,9 +293,9 @@ public class ServerSocketAccept extends AsynchronousChannelStep<Void, Void>
 			AsynchronousSocketChannel rRequestChannel,
 			Void					  rIgnored)
 		{
-			rSuspension.continuation()
-					   .scope()
-					   .async(rRequestHandler, rRequestChannel);
+			rRequestHandler.runAsync(
+				rSuspension.continuation().scope(),
+				rRequestChannel);
 
 			rSuspension.resume();
 		}

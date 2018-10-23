@@ -180,33 +180,6 @@ public class CoroutineScope extends CoroutineEnvironment
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
-	 * Starts the asynchronous execution of a coroutine in this scope with an
-	 * input value of NULL. This is typically used to start coroutines with a
-	 * void input type.
-	 *
-	 * @param  rCoroutine The coroutine
-	 *
-	 * @return The continuation of the executing coroutine
-	 */
-	public <I, O> Continuation<O> async(Coroutine<I, O> rCoroutine)
-	{
-		return rCoroutine.runAsync(this, null);
-	}
-
-	/***************************************
-	 * Starts the asynchronous execution of a coroutine in this scope.
-	 *
-	 * @param  rCoroutine The coroutine
-	 * @param  rInput     The coroutine input
-	 *
-	 * @return The continuation of the executing coroutine
-	 */
-	public <I, O> Continuation<O> async(Coroutine<I, O> rCoroutine, I rInput)
-	{
-		return rCoroutine.runAsync(this, rInput);
-	}
-
-	/***************************************
 	 * Blocks until all coroutines in this scope have finished execution. If no
 	 * coroutines are running or all have finished execution already this method
 	 * returns immediately.
@@ -259,34 +232,6 @@ public class CoroutineScope extends CoroutineEnvironment
 		}
 
 		return bCompleted;
-	}
-
-	/***************************************
-	 * Executes a coroutine in this scope with an input value of NULL and blocks
-	 * the current thread until it is finished. This is typically used to start
-	 * coroutines with a void input type.
-	 *
-	 * @param  rCoroutine The coroutine
-	 *
-	 * @return The continuation of the completed coroutine
-	 */
-	public <I, O> Continuation<O> blocking(Coroutine<I, O> rCoroutine)
-	{
-		return rCoroutine.runBlocking(this, null);
-	}
-
-	/***************************************
-	 * Executes a coroutine in this scope and blocks the current thread until it
-	 * is finished.
-	 *
-	 * @param  rCoroutine The coroutine
-	 * @param  rInput     The coroutine input
-	 *
-	 * @return The continuation of the completed coroutine
-	 */
-	public <I, O> Continuation<O> blocking(Coroutine<I, O> rCoroutine, I rInput)
-	{
-		return rCoroutine.runBlocking(this, rInput);
 	}
 
 	/***************************************

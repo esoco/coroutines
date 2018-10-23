@@ -18,7 +18,6 @@ package de.esoco.coroutine.step;
 
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
-import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Selection;
 
@@ -230,9 +229,8 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	{
 		// even if executed blocking the selection must happen asynchronously,
 		// so we just run this step as a new coroutine in the current scope
-		return rContinuation.scope()
-							.async(new Coroutine<>(this), rInput)
-							.getResult();
+		return new Coroutine<>(this).runAsync(rContinuation.scope(), rInput)
+									.getResult();
 	}
 
 	/***************************************
@@ -254,12 +252,13 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 				pCompletionCritiera,
 				pCollectCritiera);
 
-		CoroutineScope rScope = rContinuation.scope();
-
 		rContinuation.suspendTo(aSelection);
 
 		aCoroutines.forEach(
-			rCoroutine -> { aSelection.add(rScope.async(rCoroutine, rInput)); });
+			rCoroutine ->
+		{
+			aSelection.add(rCoroutine.runAsync(rContinuation.scope(), rInput));
+		});
 
 		aSelection.seal();
 	}

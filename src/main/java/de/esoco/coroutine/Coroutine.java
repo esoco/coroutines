@@ -282,6 +282,104 @@ public class Coroutine<I, O> extends RelatedObject
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
+	 * Runs a copy of this coroutine asynchronously in the given scope with an
+	 * input value of NULL.
+	 *
+	 * @param  rScope The scope to run in
+	 *
+	 * @return A {@link Continuation} that provides access to the execution
+	 *         result
+	 *
+	 * @see    #runAsync(CoroutineScope, Object)
+	 */
+	public Continuation<O> runAsync(CoroutineScope rScope)
+	{
+		return runAsync(rScope, null);
+	}
+
+	/***************************************
+	 * Runs a copy of this coroutine asynchronously in a certain scope. This
+	 * method returns a {@link Continuation} that contains the execution state
+	 * and provides access to the coroutine result AFTER it finishes. Because
+	 * the execution happens asynchronously (i.e. in another thread) the
+	 * receiving code must always use the corresponding continuation methods to
+	 * check for completion before accessing the continuation state.
+	 *
+	 * <p>Because a copy of this coroutine is executed, the continuation also
+	 * references the copy and not this instance. If the running code tries to
+	 * modify state of the coroutine it will only modify the copy, not the
+	 * original instance.</p>
+	 *
+	 * <p>If multiple coroutines need to communicate through {@link Channel
+	 * channels} they must run in the same context because channels are managed
+	 * by the context based on the channel ID.</p>
+	 *
+	 * @param  rScope The scope to run in
+	 * @param  rInput The input value
+	 *
+	 * @return A {@link Continuation} that provides access to the execution
+	 *         result
+	 */
+	@SuppressWarnings("unchecked")
+	public Continuation<O> runAsync(CoroutineScope rScope, I rInput)
+	{
+		Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
+		Continuation<O> aContinuation =
+			new Continuation<>(rScope, aRunCoroutine);
+
+		CompletableFuture<I> fExecution =
+			CompletableFuture.supplyAsync(() -> rInput, aContinuation);
+
+		aRunCoroutine.aCode.runAsync(fExecution, null, aContinuation);
+
+		return aContinuation;
+	}
+
+	/***************************************
+	 * Runs a copy of this coroutine in the given scope with an input value of
+	 * NULL and blocks the current thread until the coroutine finished.
+	 *
+	 * @param  rScope The scope to run in
+	 *
+	 * @return A {@link Continuation} that provides access to the execution
+	 *         result
+	 *
+	 * @see    #runBlocking(CoroutineScope, Object)
+	 */
+	public Continuation<O> runBlocking(CoroutineScope rScope)
+	{
+		return runBlocking(rScope, null);
+	}
+
+	/***************************************
+	 * Runs a copy of this coroutine in a certain scope and blocks the current
+	 * thread until the coroutine finished. Returns a {@link Continuation} that
+	 * contains the execution state and provides access to the coroutine result.
+	 *
+	 * <p>Because a copy of this coroutine is executed, the continuation also
+	 * references the copy and not this instance. If the running code tries to
+	 * modify state of the coroutine it will only modify the copy, not the
+	 * original instance.</p>
+	 *
+	 * @param  rScope The scope to run in
+	 * @param  rInput The input value
+	 *
+	 * @return A {@link Continuation} that provides access to the execution
+	 *         result
+	 */
+	@SuppressWarnings("unchecked")
+	public Continuation<O> runBlocking(CoroutineScope rScope, I rInput)
+	{
+		Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
+		Continuation<O> aContinuation =
+			new Continuation<>(rScope, aRunCoroutine);
+
+		aRunCoroutine.aCode.runBlocking(rInput, aContinuation);
+
+		return aContinuation;
+	}
+
+	/***************************************
 	 * Returns a new coroutine that executes additional code after that of this
 	 * instance. This and the related methods implement a builder pattern for
 	 * coroutines. The initial coroutine is created with the first step, either
@@ -366,72 +464,6 @@ public class Coroutine<I, O> extends RelatedObject
 		{
 			ObjectRelations.copyRelations(rOther, this, true);
 		}
-	}
-
-	/***************************************
-	 * Runs a copy of this coroutine asynchronously in a certain scope. This
-	 * method returns a {@link Continuation} that contains the execution state
-	 * and provides access to the coroutine result AFTER it finishes. Because
-	 * the execution happens asynchronously (i.e. in another thread) the
-	 * receiving code must always use the corresponding continuation methods to
-	 * check for completion before accessing the continuation state.
-	 *
-	 * <p>Because a copy of this coroutine is executed, the continuation also
-	 * references the copy and not this instance. If the running code tries to
-	 * modify state of the coroutine it will only modify the copy, not the
-	 * original instance.</p>
-	 *
-	 * <p>If multiple coroutines need to communicate through {@link Channel
-	 * channels} they must run in the same context because channels are managed
-	 * by the context based on the channel ID.</p>
-	 *
-	 * @param  rScope The scope to run this coroutine in
-	 * @param  rInput The input value
-	 *
-	 * @return A {@link Continuation} that provides access to the execution
-	 *         result
-	 */
-	@SuppressWarnings("unchecked")
-	Continuation<O> runAsync(CoroutineScope rScope, I rInput)
-	{
-		Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
-		Continuation<O> aContinuation =
-			new Continuation<>(rScope, aRunCoroutine);
-
-		CompletableFuture<I> fExecution =
-			CompletableFuture.supplyAsync(() -> rInput, aContinuation);
-
-		aRunCoroutine.aCode.runAsync(fExecution, null, aContinuation);
-
-		return aContinuation;
-	}
-
-	/***************************************
-	 * Runs a copy of this coroutine on the current thread in a certain context
-	 * and returns after the execution finishes. The returned {@link
-	 * Continuation} will already be finished when this method returns and
-	 * provides access to the result. If multiple coroutines should be run in
-	 * parallel by using a blocking run method the caller needs to create
-	 * multiple threads. If these threaded coroutines then need to communicated
-	 * through {@link Channel channels} they must also run in the same context
-	 * (see {@link #runAsync(CoroutineContext, Object)} for details).
-	 *
-	 * @param  rScope The context to run this coroutine in or NULL to use a new
-	 *                context instance
-	 * @param  rInput The input value
-	 *
-	 * @return The result of the execution
-	 */
-	@SuppressWarnings("unchecked")
-	Continuation<O> runBlocking(CoroutineScope rScope, I rInput)
-	{
-		Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
-		Continuation<O> aContinuation =
-			new Continuation<>(rScope, aRunCoroutine);
-
-		aRunCoroutine.aCode.runBlocking(rInput, aContinuation);
-
-		return aContinuation;
 	}
 
 	/***************************************

@@ -68,15 +68,15 @@ public class CoroutineDemo
 					"quis nostrud exerci tution ullamcorper suscipit lobortis " +
 					"nisl ut aliquip ex ea commodo consequat.\n").getBytes());
 
-		launch(run -> { run.async(fileWrite, aWriteData); });
+		launch(scope -> { fileWrite.runAsync(scope, aWriteData); });
 
 		// separate scope to wait until fully written
 		launch(
-			run ->
+			scope ->
 			{
 				ByteBuffer aReadData = ByteBuffer.allocate(10_000);
 
-				Continuation<String> c = run.async(fileRead, aReadData);
+				Continuation<String> c = fileRead.runAsync(scope, aReadData);
 
 				System.out.printf("READ: \n%s\n", c.getResult());
 			});
@@ -88,7 +88,7 @@ public class CoroutineDemo
 	 */
 	public static void demoParallelExecution()
 	{
-		Coroutine<Object, Void> cr =
+		Coroutine<Void, Void> cr =
 			first(run(() -> from(1).to(10).forEach(Math::sqrt)));
 
 		int nThreadCount    = 100_000;
@@ -102,9 +102,9 @@ public class CoroutineDemo
 			new Thread(
 				() ->
 			{
-				launch(run ->
+				launch(scope ->
 				{
-					run.blocking(cr);
+					cr.runBlocking(scope);
 					signal.countDown();
 				});
 			}).start();
@@ -122,11 +122,11 @@ public class CoroutineDemo
 		p.measure(nThreadCount + " Threads");
 
 		launch(
-			run ->
+			scope ->
 		{
 			for (int i = 0; i < nCoroutineCount; i++)
 			{
-				run.async(cr);
+				cr.runAsync(scope, null);
 			}
 		});
 
@@ -145,7 +145,7 @@ public class CoroutineDemo
 			first(sendTo(server)).then(receiveUntil(contentFullyRead()));
 
 		launch(
-			run ->
+			scope ->
 			{
 				ByteBuffer data = ByteBuffer.allocate(100_000);
 
@@ -155,7 +155,7 @@ public class CoroutineDemo
 
 				data.flip();
 
-				ByteBuffer result = run.async(cr, data).getResult();
+				ByteBuffer result = cr.runAsync(scope, data).getResult();
 
 				System.out.printf(
 					"RESPONSE: \n%s",

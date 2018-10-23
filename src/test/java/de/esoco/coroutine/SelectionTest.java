@@ -109,22 +109,23 @@ public class SelectionTest
 	private void testCollect(boolean bAsync)
 	{
 		launch(
-			run ->
+			scope ->
 			{
 				if (!bAsync)
 				{
 					// send first if blocking or else scope will remain blocked
 					ALL_CHANNELS.forEach(
-						id -> run.getChannel(id).sendBlocking(id.toString()));
+						id -> scope.getChannel(id).sendBlocking(id.toString()));
 				}
 
 				Continuation<Collection<String>> c =
-					bAsync ? run.async(COLLECT_ABC) : run.blocking(COLLECT_ABC);
+					bAsync ? COLLECT_ABC.runAsync(scope)
+						   : COLLECT_ABC.runBlocking(scope);
 
 				if (bAsync)
 				{
 					ALL_CHANNELS.forEach(
-						id -> run.getChannel(id).sendBlocking(id.toString()));
+						id -> scope.getChannel(id).sendBlocking(id.toString()));
 				}
 
 				Collection<String> rResult = c.getResult();
@@ -144,9 +145,9 @@ public class SelectionTest
 	private void testSelect(ChannelId<String> rId, boolean bAsync)
 	{
 		launch(
-			run ->
+			scope ->
 			{
-				Channel<String> channel = run.getChannel(rId);
+				Channel<String> channel = scope.getChannel(rId);
 
 				if (!bAsync)
 				{
@@ -155,7 +156,8 @@ public class SelectionTest
 				}
 
 				Continuation<String> c =
-					bAsync ? run.async(SELECT_ABC) : run.blocking(SELECT_ABC);
+					bAsync ? SELECT_ABC.runAsync(scope)
+						   : SELECT_ABC.runBlocking(scope);
 
 				if (bAsync)
 				{
