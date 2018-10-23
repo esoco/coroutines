@@ -117,18 +117,30 @@ public class Continuation<T> extends RelatedObject implements Executor
 	//~ Methods ----------------------------------------------------------------
 
 	/***************************************
-	 * Awaits the completion of this continuation. This is basically a variant
-	 * of {@link #getResult()} which ignores the result value.
+	 * Awaits the completion of the coroutine execution. Other than {@link
+	 * #getResult()} this will not throw an exception on failure or
+	 * cancellation. An application must check these by itself if needed through
+	 * {@link #getError()} and {@link #isCancelled()}.
 	 */
 	public void await()
 	{
-		getResult();
+		try
+		{
+			aFinishSignal.await();
+		}
+		catch (InterruptedException e)
+		{
+			throw new CoroutineException(e);
+		}
 	}
 
 	/***************************************
 	 * Awaits the completion of this continuation but only until a timeout is
 	 * reached. If the timeout is reached before completion the returned value
-	 * will be FALSE.
+	 * will be FALSE. Other than {@link #getResult(long, TimeUnit)} this will
+	 * not throw an exception on failure or cancellation. An application must
+	 * check these by itself if needed through {@link #getError()} and {@link
+	 * #isCancelled()}.
 	 *
 	 * @param  nTimeout The timeout value
 	 * @param  eUnit    The time unit of the the timeout
