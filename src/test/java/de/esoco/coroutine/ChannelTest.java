@@ -117,40 +117,39 @@ public class ChannelTest
 		launch(
 			scope ->
 			{
-				Continuation<String> r = null;
+				Continuation<String> result = null;
 
 				try
 				{
-					r = RECEIVE.runAsync(scope);
+					result = RECEIVE.runAsync(scope);
 
-					r.getChannel(TEST_CHANNEL).close();
-					r.await();
-					fail();
+					result.getChannel(TEST_CHANNEL).close();
+					result.getResult();
 				}
 				catch (ChannelClosedException e)
 				{
 					// expected
-					r.errorHandled();
+					result.errorHandled();
 				}
 			});
 
 		launch(
 			scope ->
 			{
-				Continuation<String> r = null;
+				Continuation<String> result = null;
 
 				try
 				{
 					scope.getChannel(TEST_CHANNEL).close();
-					r = SEND.runAsync(scope, "TEST");
+					result = SEND.runAsync(scope, "TEST");
 
-					r.await();
+					result.getResult();
 					fail();
 				}
 				catch (ChannelClosedException e)
 				{
 					// expected
-					r.errorHandled();
+					result.errorHandled();
 				}
 			});
 	}
