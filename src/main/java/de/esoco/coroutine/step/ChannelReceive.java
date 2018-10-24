@@ -22,8 +22,7 @@ import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
 
 import java.util.concurrent.CompletableFuture;
-
-import org.obrel.core.RelationType;
+import java.util.function.Function;
 
 
 /********************************************************************
@@ -40,25 +39,14 @@ public class ChannelReceive<T> extends ChannelStep<Void, T>
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance that receives from a certain channel.
-	 *
-	 * @param rId The ID of the channel
-	 */
-	public ChannelReceive(ChannelId<T> rId)
-	{
-		super(rId);
-	}
-
-	/***************************************
 	 * Creates a new instance that receives from a channel the ID of which is
 	 * provided in a state relation.
 	 *
-	 * @param rChannelType rThe type of state relation the source channel ID is
-	 *                     stored in
+	 * @param fGetChannelId The function that will return the channel ID
 	 */
-	public ChannelReceive(RelationType<ChannelId<T>> rChannelType)
+	public ChannelReceive(Function<Continuation<?>, ChannelId<T>> fGetChannelId)
 	{
-		super(rChannelType);
+		super(fGetChannelId);
 	}
 
 	//~ Static methods ---------------------------------------------------------
@@ -72,22 +60,21 @@ public class ChannelReceive<T> extends ChannelStep<Void, T>
 	 */
 	public static <T> ChannelReceive<T> receive(ChannelId<T> rId)
 	{
-		return new ChannelReceive<>(rId);
+		return new ChannelReceive<>(c -> rId);
 	}
 
 	/***************************************
 	 * Suspends until a value can be received from the channel with the ID
-	 * stored in the relation with the given type.
+	 * provided by the given function.
 	 *
-	 * @param  rChannelType rThe type of the state relation the source channel
-	 *                      ID is stored in
+	 * @param  fGetChannelId The function that will return the channel ID
 	 *
 	 * @return A new step instance
 	 */
 	public static <T> ChannelReceive<T> receive(
-		RelationType<ChannelId<T>> rChannelType)
+		Function<Continuation<?>, ChannelId<T>> fGetChannelId)
 	{
-		return new ChannelReceive<>(rChannelType);
+		return new ChannelReceive<>(fGetChannelId);
 	}
 
 	//~ Methods ----------------------------------------------------------------

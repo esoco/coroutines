@@ -22,8 +22,7 @@ import de.esoco.coroutine.CoroutineScope;
 import de.esoco.coroutine.CoroutineStep;
 
 import java.util.concurrent.CompletableFuture;
-
-import org.obrel.core.RelationType;
+import java.util.function.Function;
 
 
 /********************************************************************
@@ -43,25 +42,14 @@ public class ChannelSend<T> extends ChannelStep<T, T>
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance that sends to a certain channel.
-	 *
-	 * @param rId The ID of the channel
-	 */
-	public ChannelSend(ChannelId<T> rId)
-	{
-		super(rId);
-	}
-
-	/***************************************
 	 * Creates a new instance that sends to a channel the ID of which is
 	 * provided in a state relation.
 	 *
-	 * @param rChannelType rThe type of the state relation the target channel ID
-	 *                     is stored in
+	 * @param fGetChannelId The function that will return the channel ID
 	 */
-	public ChannelSend(RelationType<ChannelId<T>> rChannelType)
+	public ChannelSend(Function<Continuation<?>, ChannelId<T>> fGetChannelId)
 	{
-		super(rChannelType);
+		super(fGetChannelId);
 	}
 
 	//~ Static methods ---------------------------------------------------------
@@ -75,22 +63,21 @@ public class ChannelSend<T> extends ChannelStep<T, T>
 	 */
 	public static <T> ChannelSend<T> send(ChannelId<T> rId)
 	{
-		return new ChannelSend<>(rId);
+		return new ChannelSend<>(c -> rId);
 	}
 
 	/***************************************
-	 * Suspends until a value can be sent to the channel with the ID stored in
-	 * the relation with the given type.
+	 * Suspends until a value can be sent to the channel with the ID provided by
+	 * the given function.
 	 *
-	 * @param  rChannelType rThe type of the state relation the target channel
-	 *                      ID is stored in
+	 * @param  fGetChannelId The function that will return the channel ID
 	 *
 	 * @return A new step instance
 	 */
 	public static <T> ChannelSend<T> send(
-		RelationType<ChannelId<T>> rChannelType)
+		Function<Continuation<?>, ChannelId<T>> fGetChannelId)
 	{
-		return new ChannelSend<>(rChannelType);
+		return new ChannelSend<>(fGetChannelId);
 	}
 
 	//~ Methods ----------------------------------------------------------------

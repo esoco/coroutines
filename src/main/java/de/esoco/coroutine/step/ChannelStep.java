@@ -23,8 +23,7 @@ import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
 
 import java.util.Objects;
-
-import org.obrel.core.RelationType;
+import java.util.function.Function;
 
 
 /********************************************************************
@@ -36,35 +35,22 @@ public abstract class ChannelStep<I, O> extends CoroutineStep<I, O>
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private ChannelId<O>			   rChannelId;
-	private RelationType<ChannelId<O>> rChannelType;
+	private Function<Continuation<?>, ChannelId<O>> fGetChannelId;
 
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
-	 * Creates a new instance that operates on a certain channel.
-	 *
-	 * @param rId The ID of the channel to operate on
-	 */
-	public ChannelStep(ChannelId<O> rId)
-	{
-		Objects.requireNonNull(rId);
-
-		this.rChannelId = rId;
-	}
-
-	/***************************************
 	 * Creates a new instance that operates on a channel the ID of which is
-	 * provided in a certain state relation.
+	 * provided by a certain function that will be applied to the continuation
+	 * of an execution.
 	 *
-	 * @param rChannelType The type of the state relation the channel ID is
-	 *                     stored in
+	 * @param fGetChannelId The function that will return the channel ID
 	 */
-	public ChannelStep(RelationType<ChannelId<O>> rChannelType)
+	public ChannelStep(Function<Continuation<?>, ChannelId<O>> fGetChannelId)
 	{
-		Objects.requireNonNull(rChannelType);
+		Objects.requireNonNull(fGetChannelId);
 
-		this.rChannelType = rChannelType;
+		this.fGetChannelId = fGetChannelId;
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -78,18 +64,13 @@ public abstract class ChannelStep<I, O> extends CoroutineStep<I, O>
 	 */
 	public Channel<O> getChannel(Continuation<?> rContinuation)
 	{
-		ChannelId<O> rId = rChannelId;
+		ChannelId<O> rId = fGetChannelId.apply(rContinuation);
 
 		if (rId == null)
 		{
-			rId = rContinuation.getState(rChannelType);
-
-			if (rId == null)
-			{
-				throw new CoroutineException(
-					"No channel ID in %s",
-					rChannelType);
-			}
+			throw new CoroutineException(
+				"No channel ID returned by %s",
+				fGetChannelId);
 		}
 
 		return rContinuation.getChannel(rId);
