@@ -14,8 +14,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-package de.esoco.coroutine;
+package de.esoco.coroutine.examples;
 
+import de.esoco.coroutine.Continuation;
+import de.esoco.coroutine.Coroutine;
+import de.esoco.coroutine.CoroutineException;
 import de.esoco.lib.logging.Profiler;
 
 import java.net.InetSocketAddress;
@@ -44,7 +47,7 @@ import static de.esoco.lib.datatype.Range.from;
  *
  * @author eso
  */
-public class CoroutineDemo
+public class CoroutineExamples
 {
 	//~ Static methods ---------------------------------------------------------
 
