@@ -176,8 +176,8 @@ public class CoroutineScope extends CoroutineEnvironment
 	{
 		return new ScopeFuture<>(
 			new CoroutineScope(rContext),
-			rCode,
-			fGetResult);
+			fGetResult,
+			rCode);
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -578,13 +578,13 @@ public class CoroutineScope extends CoroutineEnvironment
 		 * Creates a new instance for a certain scope.
 		 *
 		 * @param rScope     The scope to await for the result
-		 * @param rCode      The code to be executed in the scope
 		 * @param fGetResult A function that retrieves the result from the scope
 		 *                   or NULL to always return NULL
+		 * @param rCode      The code to be executed in the scope
 		 */
 		public ScopeFuture(CoroutineScope					   rScope,
-						   ScopeCode						   rCode,
-						   Function<? super CoroutineScope, T> fGetResult)
+						   Function<? super CoroutineScope, T> fGetResult,
+						   ScopeCode						   rCode)
 		{
 			this.rScope     = rScope;
 			this.fGetResult = fGetResult;
