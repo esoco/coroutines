@@ -309,7 +309,7 @@ public class CoroutineTest
 	}
 
 	/***************************************
-	 * Test of {@link CoroutineScope#produce(org.obrel.core.RelationType,
+	 * Test of {@link CoroutineScope#produce(java.util.function.Function,
 	 * de.esoco.coroutine.CoroutineScope.ScopeCode)}.
 	 */
 	@Test

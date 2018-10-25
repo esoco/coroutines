@@ -16,6 +16,8 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
+import de.esoco.coroutine.CoroutineScope.ScopeCode;
+
 import de.esoco.lib.collection.CollectionUtil;
 import de.esoco.lib.concurrent.RunLock;
 
@@ -26,8 +28,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 
-import org.obrel.core.RelationType;
 import org.obrel.type.MetaTypes;
 
 import static de.esoco.coroutine.Coroutines.EXCEPTION_HANDLER;
@@ -138,17 +140,17 @@ public class CoroutineScope extends CoroutineEnvironment
 	 * Launches a new scope that is expected to produce a result in the {@link
 	 * Coroutines#getDefaultContext() default context}.
 	 *
-	 * @param rResultType The relation type to query the produced result with or
-	 *                    NULL to always return NULL as the result
-	 * @param rCode       The producing code to execute in the scope
+	 * @param fGetResult A function that retrieves the result from the scope or
+	 *                   NULL to always return NULL
+	 * @param rCode      The producing code to execute in the scope
 	 *
 	 * @see   #produce(CoroutineContext, RelationType, ScopeCode)
 	 */
 	public static <T> ScopeFuture<T> produce(
-		RelationType<T> rResultType,
-		ScopeCode		rCode)
+		Function<? super CoroutineScope, T> fGetResult,
+		ScopeCode							rCode)
 	{
-		return produce(null, rResultType, rCode);
+		return produce(null, fGetResult, rCode);
 	}
 
 	/***************************************
@@ -159,22 +161,23 @@ public class CoroutineScope extends CoroutineEnvironment
 	 * execution the relation type can be NULL, in which case the future result
 	 * will also be NULL.
 	 *
-	 * @param  rContext    The coroutine context for the scope
-	 * @param  rResultType The relation type to query the produced result with
-	 *                     or NULL to always return NULL as the result
-	 * @param  rCode       The producing code to execute in the scope
+	 * @param  rContext   The coroutine context for the scope
+	 * @param  fGetResult A function that retrieves the result from the scope or
+	 *                    NULL to always return NULL
+	 * @param  rCode      The producing code to execute in the scope
 	 *
 	 * @return A future that provides access to the result of the scope
 	 *         execution
 	 */
-	public static <T> ScopeFuture<T> produce(CoroutineContext rContext,
-											 RelationType<T>  rResultType,
-											 ScopeCode		  rCode)
+	public static <T> ScopeFuture<T> produce(
+		CoroutineContext					rContext,
+		Function<? super CoroutineScope, T> fGetResult,
+		ScopeCode							rCode)
 	{
 		return new ScopeFuture<>(
 			new CoroutineScope(rContext),
 			rCode,
-			rResultType);
+			fGetResult);
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -564,8 +567,8 @@ public class CoroutineScope extends CoroutineEnvironment
 	{
 		//~ Instance fields ----------------------------------------------------
 
-		private CoroutineScope  rScope;
-		private RelationType<T> rResultType;
+		private CoroutineScope					    rScope;
+		private Function<? super CoroutineScope, T> fGetResult;
 
 		private Exception eScopeCodeError;
 
@@ -574,17 +577,17 @@ public class CoroutineScope extends CoroutineEnvironment
 		/***************************************
 		 * Creates a new instance for a certain scope.
 		 *
-		 * @param rScope      The scope to await for the result
-		 * @param rCode       The code to be executed in the scope
-		 * @param rResultType A relation type to query the result with after the
-		 *                    scope has finished
+		 * @param rScope     The scope to await for the result
+		 * @param rCode      The code to be executed in the scope
+		 * @param fGetResult A function that retrieves the result from the scope
+		 *                   or NULL to always return NULL
 		 */
-		public ScopeFuture(CoroutineScope  rScope,
-						   ScopeCode	   rCode,
-						   RelationType<T> rResultType)
+		public ScopeFuture(CoroutineScope					   rScope,
+						   ScopeCode						   rCode,
+						   Function<? super CoroutineScope, T> fGetResult)
 		{
-			this.rScope		 = rScope;
-			this.rResultType = rResultType;
+			this.rScope     = rScope;
+			this.fGetResult = fGetResult;
 
 			try
 			{
@@ -676,7 +679,7 @@ public class CoroutineScope extends CoroutineEnvironment
 				throw new CancellationException("Scope is cancelled");
 			}
 
-			return rResultType != null ? rScope.get(rResultType) : null;
+			return fGetResult != null ? fGetResult.apply(rScope) : null;
 		}
 	}
 }
