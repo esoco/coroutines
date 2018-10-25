@@ -43,7 +43,7 @@ import static org.obrel.type.StandardTypes.NAME;
  * modern Java features of which some are available starting with Java 8. The
  * execution of coroutine steps is done with {@link CompletableFuture} which in
  * turn runs the code by default in the {@link ForkJoinPool#commonPool() common
- * thread pool} defined in the {@link ForkJoinPool} class. But if needed the
+ * thread pool} defined in the {@link ForkJoinPool} class. But if necessary the
  * {@link Executor} used for running coroutines can be changed.</p>
  *
  * <p>To provide a fluent and readable declaration the API makes extensive use
@@ -55,58 +55,56 @@ import static org.obrel.type.StandardTypes.NAME;
  * <p>From the outside a coroutine is a function that receives an input value,
  * processes it, and return an output value as the result of the execution. This
  * is similar to the {@link Function} interface introduced with Java 8. If
- * invoked {@link CoroutineScope#blocking(Coroutine) blocking} it will behave
- * exactly like a standard function, blocking the current thread until the
- * processing has finished and the result value has been produced. But if
- * invoked with {@link CoroutineScope#async(Coroutine) asynchronously} the
- * coroutine will be executed in parallel to the current thread, suspending it's
- * execution shortly between processing steps or even pausing until data is
- * available.</p>
+ * invoked {@link #runBlocking(CoroutineScope) blocking} it will behave exactly
+ * like a standard function, blocking the current thread until the processing
+ * has finished and the result value has been produced. But if invoked {@link
+ * #runAsync(CoroutineScope) asynchronously} the coroutine will be executed in
+ * parallel to the current thread, suspending it's execution shortly between
+ * processing steps or even pausing until data is available.</p>
  *
  * <p>Besides this Coroutine class there are a few other classes that play an
  * important role in the execution of coroutines:</p>
  *
  * <ul>
- *   <li>{@link CoroutineContext}: Each coroutine runs in a certain context. The
+ *   <li>{@link CoroutineContext}: coroutines run in a certain context. The
  *     context can either be provided explicitly or else the {@link
  *     Coroutines#getDefaultContext() default context} is used. If different
  *     coroutines need to communicate during their execution they need to run in
  *     the same context. The context can also be used to provide configuration
  *     for the coroutines running in it.</li>
- *   <li>{@link CoroutineScope}: Coroutines can only be launched from the inside
- *     of a scope. The scope provides the runtime environment for an arbitrary
- *     set of coroutines. It also serves as a defined entry and exit-point into
- *     coroutine executions: a scope will block execution of the creating thread
- *     until all coroutines in it have finished execution (either successfully,
- *     by cancelation, or with an error). This follows the patter of <i>
- *     structured concurrency</i> which prevents "forgotten" coroutine
- *     executions running in the background or terminating silently with an
- *     error. The scope also provides configuration and shared state for the
- *     coroutines in it, overriding the more general configuration in the
- *     context.</li>
+ *   <li>{@link CoroutineScope}: coroutines can only be launched inside a scope.
+ *     The scope provides the runtime environment for an arbitrary number of
+ *     coroutines. It also serves as a defined entry and exit-point into
+ *     coroutine executions: a scope will block execution of the launching
+ *     thread until all coroutines in it have finished execution (either
+ *     successfully, by cancelation, or with an error). This follows the pattern
+ *     of <i>structured concurrency</i> which prevents "forgotten" executions
+ *     running in the background or terminating silently with an error. The
+ *     scope also provides configuration and shared state for the coroutines in
+ *     it, overriding any configuration in the context.</li>
  *   <li>{@link Continuation}: Every execution of a coroutine is associated with
- *     a continuation object that contains the current state. It is local to
- *     that execution and not shared with other running instances of the same or
- *     other coroutines.</li>
+ *     a continuation object that contains the current execution state. It is
+ *     local to a single execution and thus not shared with other running
+ *     instances of the same or other coroutines.</li>
  *   <li>{@link CoroutineStep}: The base for all steps that can be executed in a
- *     coroutine. Like the coroutine itself it basically is a function that
+ *     coroutine. Like the coroutine itself it is basically a function that
  *     receives an input value and produces a result. When executing
  *     asynchronously a step implementation can suspend it's execution by
  *     stopping the background execution completely until the condition that
- *     caused suspension no longer exists (e.g. data becomes available). Several
- *     standard steps are defined in the 'step' sub-package but the base class
- *     can also be extended to create new kinds of coroutine steps.</li>
+ *     caused the suspension no longer exists (e.g. a resource becomes
+ *     available). Several standard steps are defined in the 'step' sub-package
+ *     but the base class can also be extended to create new kinds of coroutine
+ *     steps.</li>
  *   <li>{@link Suspension}: If a step signals to suspend it's asynchronous
  *     execution a suspension object is created. The suspension contains the
- *     current execution state, mainly by referencing the associated {@link
- *     Continuation}. When the suspending condition is resolved it can be used
- *     to resume the asynchronous execution of the coroutine at the step after
- *     the suspension.</li>
+ *     suspended execution state, mainly by referencing the associated {@link
+ *     Continuation}. When the suspending condition is resolved the suspension
+ *     can be used to resume the asynchronous execution of the coroutine.</li>
  *   <li>{@link Channel}: The previous classes are always involved when building
  *     and executing coroutines. Channels are an optional but important feature
  *     because they allow multiple coroutines to communicate without blocking
- *     the execution thread. A coroutine will automatically suspend it's
- *     execution if a channel use to receive or send has no data or capacity
+ *     their threads. A coroutine will automatically suspend it's execution if a
+ *     channel that is used for receiving or sending has no data or capacity
  *     available. As soon as the channel becomes available again the coroutine
  *     will continue to run. Channels are managed by either the scope or the
  *     context the coroutine runs in. If coroutines in different scopes need to
@@ -136,27 +134,29 @@ import static org.obrel.type.StandardTypes.NAME;
  * <p>After a coroutine has been created it can be extended with additional
  * steps by invoking the instance method {@link #then(CoroutineStep)} on it.
  * This method takes the next step to be executed and <b>returns a new coroutine
- * instance</b>. This means that coroutines are <b>effectively immutable</b>,
- * i.e. they cannot be modified after they have been created. Only new
- * coroutines can be created from them. This allows to declare coroutine
- * templates which can be extended by adding additional processing steps without
- * the risk of changing the original. Thus the {@link #first(CoroutineStep)
- * first()} and {@link #then(CoroutineStep) then()} methods implement a builder
- * pattern where each invocation creates a new coroutine instance.</p>
+ * instance</b>. This means that <b>coroutines are immutable</b>, i.e. they
+ * cannot be modified after they have been created. Only new coroutines can be
+ * created from them. This allows to declare coroutine templates which can be
+ * extended by adding additional processing steps without the risk of changing
+ * the original. Thus the {@link #first(CoroutineStep) first()} and {@link
+ * #then(CoroutineStep) then()} methods implement a builder pattern where each
+ * invocation creates a new coroutine instance.</p>
  *
- * <p>The immutability of coroutines only covers their "explicit" internal
- * state. The Coroutine class also extends {@link RelatedObject} and therefore
- * allows to set arbitrary relations on it which can be used to configure step
- * behavior or set default data, for example. To also make the relations of an
- * instance immutable (to "seal" a coroutine template) just set the flag
- * relation {@link MetaTypes#IMMUTABLE IMMUTABLE} on it which will prevent the
- * further modification of relations. This will then also effect all running
- * instances of the coroutine (see below).</p>
+ * <p>The immutability of coroutines initially only covers their code (i.e. the
+ * step sequence). The Coroutine class also extends {@link RelatedObject} and
+ * therefore allows to set arbitrary relations on it which can be used to
+ * configure step behavior or set default data, for example. To also make the
+ * relations of an instance immutable (basically sealing the coroutine template)
+ * just set the flag relation {@link MetaTypes#IMMUTABLE IMMUTABLE} on it which
+ * will prevent the further modification of relations. This flag will not be
+ * copied on started coroutines (which are always a copy of the original
+ * coroutine). This allows to modify the instances of immutable coroutine
+ * templates.</p>
  *
  * <p>When a coroutine is executed a copy of it is created and then associated
  * with a new {@link Continuation} instance. That prevents running code to
- * modify the the coroutine (template) it has been started from but gives it
- * access to any of it's relations. The actual runtime state is stored in the
+ * modify the coroutine (template) it has been started from but gives it access
+ * to any of it's relations. The actual runtime state is stored in the
  * continuation object and may be modified freely by the coroutine code. It is
  * recommended that coroutine steps use the continuation if they need to share
  * data with other steps besides the standard input and output parameters.</p>
@@ -186,11 +186,9 @@ import static org.obrel.type.StandardTypes.NAME;
  * <p>Therefore it is strongly advised to not perform "classical"
  * synchronizations from coroutine steps. Instead it should be checked whether
  * it is possible to implement this in a cooperative way by suspending the
- * coroutine execution while waiting for a resource. An example would be to
- * perform the waiting in a separate thread (outside of the coroutine thread
- * pool) and resume the coroutine when the resource becomes available. An even
- * better way would be to use a natively asynchronous API like in the java.nio
- * package (see the sub-package 'step.nio' for examples).</p>
+ * coroutine execution while waiting for a resource. This can be achieved by
+ * using an asynchronous API for accessing a resource, like that provided by the
+ * java.nio package (see the sub-package 'step.nio' for examples).</p>
  *
  * @author eso
  */
@@ -462,7 +460,11 @@ public class Coroutine<I, O> extends RelatedObject
 
 		if (rOther != null)
 		{
-			ObjectRelations.copyRelations(rOther, this, true);
+			ObjectRelations.copyRelations(
+				rOther,
+				this,
+				true,
+				r -> r.getType() != MetaTypes.IMMUTABLE);
 		}
 	}
 
