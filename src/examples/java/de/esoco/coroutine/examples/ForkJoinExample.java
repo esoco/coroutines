@@ -36,10 +36,10 @@ import static org.obrel.core.RelationTypes.newInitialValueType;
 
 
 /********************************************************************
- * An example of coroutine executions similar to {@link ForkJoinTask}. This
+ * An example of a fork-join coroutine execution like {@link ForkJoinTask}. This
  * implementation is derived from <a
  * href="https://github.com/Kotlin/kotlinx.coroutines/blob/master/benchmarks/src/jmh/kotlin/benchmarks/ForkJoinBenchmark.kt">
- * the Kotlin Fork-Join benchmark</a>.
+ * the Kotlin Fork-Join benchmark</a> and results should be comparable.
  *
  * @author eso
  */
@@ -61,9 +61,9 @@ public class ForkJoinExample
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Runs the benchmark.
+	 * Main.
 	 *
-	 * @param rArgs The arguments
+	 * @param rArgs
 	 */
 	public static void main(String[] rArgs)
 	{
@@ -81,7 +81,7 @@ public class ForkJoinExample
 		ScopeFuture<DoubleAdder> aResult =
 			produce(
 				RESULT,
-				scope -> computeAsync(scope, aCoefficients, 0, TASK_SIZE));
+				scope -> computeOrSplit(scope, aCoefficients, 0, TASK_SIZE));
 
 		System.out.printf("Sum: %f\n", aResult.get().sum());
 
@@ -94,50 +94,37 @@ public class ForkJoinExample
 	}
 
 	/***************************************
-	 * Computes the algorithm for all coefficients in the given partition.
-	 *
-	 * @param  rCoefficients The array of all coefficients
-	 * @param  nStart        The partition start index (inclusive)
-	 * @param  nEnd          The partition end index (exclusive)
-	 *
-	 * @return The computation result
-	 */
-	private static double compute(long[] rCoefficients, int nStart, int nEnd)
-	{
-		double fResult = 0;
-
-		for (int i = nStart; i < nEnd; i++)
-		{
-			fResult += Math.sin(Math.pow(rCoefficients[i], 1.1)) + 1e-8;
-		}
-
-		return fResult;
-	}
-
-	/***************************************
-	 * Starts coroutines for the computation of two half-size partitions unless
-	 * the batch size is reached in which case {@link #compute(long[], int,
-	 * int)} is invoked and added to the result.
+	 * computes the result if the partition size is below the batch size
+	 * threshold or else splits the partition into two halves and retries
+	 * recursively.
 	 *
 	 * @param rScope        The scope
 	 * @param rCoefficients The array of all coefficients to add
 	 * @param nStart        The full partition start index (inclusive)
 	 * @param nEnd          The full partition end index (exclusive)
 	 */
-	private static void computeAsync(CoroutineScope rScope,
-									 long[]			rCoefficients,
-									 int			nStart,
-									 int			nEnd)
+	private static void computeOrSplit(CoroutineScope rScope,
+									   long[]		  rCoefficients,
+									   int			  nStart,
+									   int			  nEnd)
 	{
 		if (nEnd - nStart <= BATCH_SIZE)
 		{
-			rScope.get(RESULT).add(compute(rCoefficients, nStart, nEnd));
+			double fResult = 0;
+
+			for (int i = nStart; i < nEnd; i++)
+			{
+				fResult += Math.sin(Math.pow(rCoefficients[i], 1.1)) + 1e-8;
+			}
+
+			// use a synchronized relation value to collect the result
+			rScope.get(RESULT).add(fResult);
 		}
 		else
 		{
 			new Coroutine<>(
 				run(() ->
-						computeAsync(
+						computeOrSplit(
 							rScope,
 							rCoefficients,
 							nStart,
@@ -145,7 +132,7 @@ public class ForkJoinExample
 
 			new Coroutine<>(
 				run(() ->
-						computeAsync(
+						computeOrSplit(
 							rScope,
 							rCoefficients,
 							nStart + (nEnd - nStart) / 2,
