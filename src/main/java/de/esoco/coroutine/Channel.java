@@ -31,6 +31,20 @@ import java.util.concurrent.LinkedBlockingQueue;
  * data is requested by receivers. Receiving will be suspended if no more data
  * is available in a channel.
  *
+ * <p>Channels can be queried with the method {@link
+ * CoroutineEnvironment#getChannel(ChannelId) getChannel(ChannelId)} which is
+ * available in {@link CoroutineScope} and {@link CoroutineContext}. If no
+ * channel exists at first access a new channel with a capacity of 1 will be
+ * created. A channel with a different capacity can be created with {@link
+ * CoroutineEnvironment#createChannel(ChannelId, int) createChannel(ChannelId,
+ * int)}, but only if it doesn't exist already. Channels can be removed with
+ * {@link CoroutineEnvironment#removeChannel(ChannelId)
+ * removeChannel(ChannelId)}.</p>
+ *
+ * <p>If a channel is needed for the communication between coroutines in
+ * different scopes it needs to be created in a common context of the scopes. If
+ * it is only needed in a particular scope it should be created there.</p>
+ *
  * <p>Channels can be closed by invoking {@link #close()}. A closed channel
  * rejects any further send or receive calls by throwing a {@link
  * ChannelClosedException}. Upon a close all pending suspensions will also be

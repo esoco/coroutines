@@ -38,13 +38,23 @@ import static de.esoco.coroutine.Coroutines.closeManagedResources;
 
 /********************************************************************
  * A scope that manages one or more running coroutines. A new scope is created
- * through the factory method {@link #launch(CoroutineContext, ScopeCode)}. It
- * receives an instance of the functional interface {@link ScopeCode} and blocks
- * the invoking thread until all started coroutines have finished execution
- * (either successfully or with an exception).
+ * through the factory method {@link #launch(CoroutineContext, ScopeCode)} It
+ * executes an instance of the functional interface {@link ScopeCode} and blocks
+ * the invoking thread until the code and all coroutines by it have finished
+ * execution (either successfully or with an exception).
  *
- * <p>The scope will also automatically close all ({@link AutoCloseable})
- * resources that are stored in this scope in relations with the annotation
+ * <p>An alternative way to launch a scope is by using the method {@link
+ * #produce(CoroutineContext, Function, ScopeCode)}. It also executes the given
+ * code (which in turn may start coroutines) but returns immediately after the
+ * code finished with a {@link ScopeFuture} instance. This sub-interface of
+ * {@link Future} can then be used to wait for the started coroutines to finish
+ * or to cancel the execution. As the name indicates, this method is mainly
+ * intended for scope executions that produce result. But it can also be used to
+ * just wrap a scope execution to handle it as a future and then ignore the
+ * result.</p>
+ *
+ * <p>A scope will also automatically close all ({@link AutoCloseable})
+ * resources that are stored in it with relations that have the annotation
  * {@link MetaTypes#MANAGED}.</p>
  *
  * @author eso
