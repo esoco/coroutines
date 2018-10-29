@@ -107,7 +107,7 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	public static <I, O> Collect<I, O> collect(
 		Coroutine<? super I, ? extends O>... rFromCoroutines)
 	{
-		return new Collect<>(asList(rFromCoroutines));
+		return new Collect<I, O>(asList(rFromCoroutines));
 	}
 
 	/***************************************

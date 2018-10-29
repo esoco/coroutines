@@ -113,7 +113,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	public static <I, O> Select<I, O> select(
 		Coroutine<? super I, ? extends O>... rFromCoroutines)
 	{
-		return new Select<>(asList(rFromCoroutines));
+		return new Select<I, O>(asList(rFromCoroutines));
 	}
 
 	/***************************************
