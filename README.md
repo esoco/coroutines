@@ -1,5 +1,8 @@
 # Java Coroutines
 
+Travis build status:  
+[![Build Status](https://www.travis-ci.org/esoco/coroutines.svg?branch=master)](https://www.travis-ci.org/esoco/coroutines)
+
 This project contains a pure Java implementation of coroutines. I has a single dependency to the [ObjectRelations project](https://github.com/esoco/objectrelations). It can be build locally after cloning by starting a gradle build with `gradlew build`. To include coroutines into a project, add the dependency to your project. In gradle it would look like this:
 
 ```gradle
