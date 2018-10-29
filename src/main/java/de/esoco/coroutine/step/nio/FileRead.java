@@ -69,7 +69,7 @@ public class FileRead extends AsynchronousFileStep
 	 * buffer is reached before the EOF signal is received the coroutine will be
 	 * terminated with a {@link CoroutineException}. To stop reading when a
 	 * certain condition is met a derived step can be created with {@link
-	 * #until(Predicate)}.
+	 * #until(BiPredicate)}.
 	 *
 	 * <p>After the data has been fully received {@link ByteBuffer#flip()} will
 	 * be invoked on the buffer so that it can be used directly for subsequent

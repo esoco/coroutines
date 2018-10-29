@@ -16,8 +16,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
-import de.esoco.coroutine.CoroutineScope.ScopeCode;
-
 import de.esoco.lib.collection.CollectionUtil;
 import de.esoco.lib.concurrent.RunLock;
 
@@ -154,7 +152,7 @@ public class CoroutineScope extends CoroutineEnvironment
 	 *                   NULL to always return NULL
 	 * @param rCode      The producing code to execute in the scope
 	 *
-	 * @see   #produce(CoroutineContext, RelationType, ScopeCode)
+	 * @see   #produce(CoroutineContext, Function, ScopeCode)
 	 */
 	public static <T> ScopeFuture<T> produce(
 		Function<? super CoroutineScope, T> fGetResult,
@@ -554,7 +552,7 @@ public class CoroutineScope extends CoroutineEnvironment
 
 		/***************************************
 		 * Starts coroutines in the given {@link CoroutineScope} by invoking
-		 * methods like {@link CoroutineScope#async(Coroutine)} on it and
+		 * methods like {@link Coroutine#runAsync(CoroutineScope)} on it and
 		 * optionally also performs other operations, like processing the
 		 * results.
 		 *

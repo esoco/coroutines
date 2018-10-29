@@ -65,7 +65,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	//~ Static methods ---------------------------------------------------------
 
 	/***************************************
-	 * Returns a new predicate to be used with {@link #until(Predicate)} that
+	 * Returns a new predicate to be used with {@link #until(BiPredicate)} that
 	 * checks whether a byte buffer contains the complete content of an HTTP
 	 * response. The test is performed by calculating the full data size from
 	 * the 'Content-Length' attribute in the response header and comparing it
@@ -91,7 +91,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	 * <p>The returned step only receives the next block of data that is sent by
 	 * the remote socket and then continues the coroutine execution. If data
 	 * should be read until a certain condition is met a derived step needs to
-	 * be created with {@link #until(Predicate)}.</p>
+	 * be created with {@link #until(BiPredicate)}.</p>
 	 *
 	 * @param  fGetSocketAddress A function that provides the source socket
 	 *                           address from the current continuation
@@ -120,7 +120,7 @@ public class SocketReceive extends AsynchronousSocketStep
 	 * send operation.
 	 *
 	 * <p>The predicate argument is the same as for the {@link
-	 * #until(Predicate)} method.</p>
+	 * #until(BiPredicate)} method.</p>
 	 *
 	 * @param  pCheckFinished A predicate that checks whether the data has been
 	 *                        received completely
