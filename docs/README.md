@@ -1,6 +1,67 @@
 # Java Coroutines
 
-This project contains a pure Java implementation of coroutines. I has a single dependency to the [ObjectRelations project](https://github.com/esoco/objectrelations). It can be build locally after cloning by starting a gradle build with `gradlew build`. Usage information can be found on our [documentation site](https://esoco.gitbook.io/sdack/coroutines/introduction) and in the [generated javadoc](https://esoco.github.io/coroutines/javadoc/).
+This project contains a pure Java implementation of coroutines. I has a single dependency to the [ObjectRelations project](https://github.com/esoco/objectrelations). It can be build locally after cloning by starting a gradle build with `gradlew build`. To include coroutines into a project, add the dependency to your project. In gradle it would look like this:
+
+```gradle
+dependencies {
+	compile 'de.esoco:coroutines:0.9.0'
+}
+```
+
+The following gives only a short overview of how to use this project. More detailed information can be found on our [documentation site](https://esoco.gitbook.io/sdack/coroutines/introduction) and in the [generated javadoc](https://esoco.github.io/coroutines/javadoc/).
+
+## Declaring Coroutines
+
+Coroutines are used in two stages: the first is the declaration of coroutines, the second their execution. To declare coroutines this framework provides a simple builder pattern that starts with the invocation of the static factory method [Coroutine.first(CoroutineStep)](https://esoco.github.io/coroutines/javadoc/de/esoco/coroutine/Coroutine.html#first-de.esoco.coroutine.CoroutineStep-). This creates a new coroutine instance that invokes a certain execution step. Afterward the coroutine can be extended with additional steps by invoking the instance method [Coroutine.then(CoroutineStep)](https://esoco.github.io/coroutines/javadoc/de/esoco/coroutine/Coroutine.html#then-de.esoco.coroutine.CoroutineStep-). Each call of `then()` will return a new coroutine instance because coroutines are immutable. That allows to use existing coroutines as templates for derived coroutines.
+
+### Coroutine Steps
+
+The execution steps of a coroutine are instances of the abstract class [CoroutineStep](https://esoco.github.io/coroutines/javadoc/de/esoco/coroutine/CoroutineStep.html). The sub-package `step` contains several pre-defined step implementations as well as several asynchronous I/O steps in the sub-package`step.nio`. All framework steps have static factory methods that can be used in conjunction with the coroutine builder methods and by applying static imports to declare coroutines with a fluent API. A simple example based on the step [CodeExecution](https://esoco.github.io/coroutines/javadoc/de/esoco/coroutine/step/CodeExecution.html) which executes functional expressions would look like this:
+
+```java
+import static de.esoco.coroutine.Coroutine.*;
+import static de.esoco.coroutine.step.CodeExecution.*;
+
+Coroutine<String, Integer> parseInteger =
+    Coroutine.first(apply((String s) -> s.trim()))
+             .then(apply(s -> Integer.valueOf(s)));
+```
+
+## Executing Coroutines
+
+The execution of coroutines follows the pattern of structured concurrency and therefore requires an enclosing [CoroutineScope](https://esoco.github.io/coroutines/javadoc/de/esoco/coroutine/CoroutineScope.html). Like coroutines the scope provides a static factory method that receives a functional interface implementation which contains the code to run. That code can then run arbitrary coroutines asynchronously in the scope like in this example:
+
+```java
+Coroutine<?, ?> crunchNumbers =
+    first(run(() -> Range.from(1).to(10).forEach(Math::sqrt)));
+
+CoroutineScope.launch(scope -> {
+    // start a million coroutines
+    for (int i = 0; i < 1_000_000; i++) {
+        crunchNumbers.runAsync(scope);
+    }
+});
+```
+
+Any code that would follow after the scope launch block will only run after all coroutines have finished execution, either regularly or with an error. In the latter case the scope would also throw an exception if at least one coroutine fails.
+
+### Continuation
+
+Each start of a coroutine produces a [Continuation](https://esoco.github.io/coroutines/javadoc/de/esoco/coroutine/Continuation.html) object that can be used to observe and if necessary cancel the asynchronous coroutine execution. If the coroutines has finished execution it provides access to the produced result (if such exists).
+
+### ScopeFuture 
+
+If a coroutine scope needs to produce a value it can be started by means of the `produce` method instead of `launch`. That method returns immediately with an instance of `java.util.concurrent.Future` which can then be used to monitor the scope execution and to query the result or error state after completion. This method can also be used if handling a scope through a future is preferred over a launch block. In any case the execution of the asynchronous code is contained and can be supervised by the application. A simple example:
+
+```java
+Future<String> futureResult = 
+  produce(scope -> getScopeResult(scope), 
+          scope -> someCoroutine.runAsync(scope, "input"));
+
+String result = futureResult.get();
+```
+
+## Project Structure
 
 The main package of this project is `de.esoco.coroutine`. It contains the core classes of the framework:
 
