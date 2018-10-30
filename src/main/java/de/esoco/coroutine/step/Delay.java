@@ -26,11 +26,7 @@ import de.esoco.lib.datatype.Pair;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-
-import org.obrel.core.RelationType;
-import org.obrel.type.StandardTypes;
-
-import static org.obrel.type.StandardTypes.DURATION;
+import java.util.function.Function;
 
 
 /********************************************************************
@@ -40,30 +36,22 @@ import static org.obrel.type.StandardTypes.DURATION;
  */
 public class Delay<T> extends CoroutineStep<T, T>
 {
+	//~ Instance fields --------------------------------------------------------
+
+	private Function<Continuation<?>, Pair<Long, TimeUnit>> fGetDuration;
+
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
 	 * Creates a new instance.
 	 *
-	 * @param rDurationType The relation type to store the delay duration in
-	 * @param nDuration     The duration to pause
-	 * @param eUnit         The time unit of the duration
+	 * @param fGetDuration A function that determines the duration to sleep from
+	 *                     the continuation
 	 */
-	public Delay(RelationType<Pair<Long, TimeUnit>> rDurationType,
-				 long								nDuration,
-				 TimeUnit							eUnit)
+	public Delay(Function<Continuation<?>, Pair<Long, TimeUnit>> fGetDuration)
 	{
-		if (nDuration < 0)
-		{
-			throw new IllegalArgumentException("Duration must be >= 0");
-		}
-
-		Objects.requireNonNull(eUnit);
-
-		if (eUnit != null)
-		{
-			set(DURATION, Pair.of(nDuration, eUnit));
-		}
+		this.fGetDuration = fGetDuration;
+		Objects.requireNonNull(fGetDuration);
 	}
 
 	//~ Static methods ---------------------------------------------------------
@@ -75,7 +63,7 @@ public class Delay<T> extends CoroutineStep<T, T>
 	 *
 	 * @see   #sleep(int, TimeUnit)
 	 */
-	public static <T> Delay<T> sleep(int nMilliseconds)
+	public static <T> Delay<T> sleep(long nMilliseconds)
 	{
 		return sleep(nMilliseconds, TimeUnit.MILLISECONDS);
 	}
@@ -85,29 +73,28 @@ public class Delay<T> extends CoroutineStep<T, T>
 	 * relation. The lookup of the duration value follows the rules defined by
 	 * {@link Continuation#getState(RelationType, Object)}.
 	 *
-	 * @param  rDurationType The relation type of the sleep duration
+	 * @param  fGetDuration A function that determines the duration to sleep
+	 *                      from the continuation
 	 *
 	 * @return A new step instance
 	 */
 	public static <T> Delay<T> sleep(
-		RelationType<Pair<Long, TimeUnit>> rDurationType)
+		Function<Continuation<?>, Pair<Long, TimeUnit>> fGetDuration)
 	{
-		return new Delay<>(rDurationType, 0, null);
+		return new Delay<>(fGetDuration);
 	}
 
 	/***************************************
-	 * Suspends the coroutine execution for a certain duration. The configured
-	 * duration can be overridden in the current continuation by setting the
-	 * state relation {@link StandardTypes#DURATION}.
+	 * Suspends the coroutine execution for a certain duration.
 	 *
 	 * @param  nDuration The duration to sleep
 	 * @param  eUnit     The time unit of the duration
 	 *
 	 * @return A new step instance
 	 */
-	public static <T> Delay<T> sleep(int nDuration, TimeUnit eUnit)
+	public static <T> Delay<T> sleep(long nDuration, TimeUnit eUnit)
 	{
-		return new Delay<>(DURATION, nDuration, eUnit);
+		return new Delay<>(c -> Pair.of(nDuration, eUnit));
 	}
 
 	//~ Methods ----------------------------------------------------------------
@@ -120,7 +107,7 @@ public class Delay<T> extends CoroutineStep<T, T>
 	{
 		try
 		{
-			Pair<Long, TimeUnit> rDuration = getDuration(rContinuation);
+			Pair<Long, TimeUnit> rDuration = fGetDuration.apply(rContinuation);
 
 			rDuration.second().sleep(rDuration.first());
 		}
@@ -144,7 +131,7 @@ public class Delay<T> extends CoroutineStep<T, T>
 				  			v ->
 				  			{
 				  				Pair<Long, TimeUnit> rDuration =
-				  					getDuration(rContinuation);
+				  					fGetDuration.apply(rContinuation);
 
 				  				rContinuation.context()
 				  				.getScheduler()
@@ -160,21 +147,5 @@ public class Delay<T> extends CoroutineStep<T, T>
 				  			rContinuation)
 						  .exceptionally(t ->
 				  				rContinuation.fail(t));
-	}
-
-	/***************************************
-	 * Returns the duration from either the current continuation or, if not set,
-	 * from this step.
-	 *
-	 * @param  rContinuation The continuation
-	 *
-	 * @return The duration
-	 */
-	private Pair<Long, TimeUnit> getDuration(Continuation<?> rContinuation)
-	{
-		Pair<Long, TimeUnit> rDuration =
-			rContinuation.getState(DURATION, get(DURATION));
-
-		return rDuration;
 	}
 }
