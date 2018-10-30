@@ -30,7 +30,7 @@ import java.util.function.Function;
 
 
 /********************************************************************
- * A suspending {@link Coroutine} step that performes delayed executions.
+ * A suspending {@link Coroutine} step that performs delayed executions.
  *
  * @author eso
  */
@@ -61,7 +61,7 @@ public class Delay<T> extends CoroutineStep<T, T>
 	 *
 	 * @param nMilliseconds The milliseconds to sleep
 	 *
-	 * @see   #sleep(int, TimeUnit)
+	 * @see   #sleep(long, TimeUnit)
 	 */
 	public static <T> Delay<T> sleep(long nMilliseconds)
 	{
