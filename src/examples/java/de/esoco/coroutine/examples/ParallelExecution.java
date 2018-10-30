@@ -25,7 +25,10 @@ import java.util.concurrent.CountDownLatch;
 
 import static de.esoco.coroutine.Coroutine.first;
 import static de.esoco.coroutine.CoroutineScope.launch;
+import static de.esoco.coroutine.step.CodeExecution.consume;
 import static de.esoco.coroutine.step.CodeExecution.run;
+import static de.esoco.coroutine.step.CodeExecution.supply;
+import static de.esoco.coroutine.step.Iteration.forEach;
 
 import static de.esoco.lib.datatype.Range.from;
 
@@ -40,7 +43,7 @@ public class ParallelExecution
 {
 	//~ Static fields/initializers ---------------------------------------------
 
-	private static final int THREAD_COUNT    = 10_000;
+	private static final int THREAD_COUNT    = 100_000;
 	private static final int COROUTINE_COUNT = 100_000;
 
 	//~ Static methods ---------------------------------------------------------
@@ -52,8 +55,12 @@ public class ParallelExecution
 	 */
 	public static void main(String[] rArgs)
 	{
-		Coroutine<Void, Void> cr =
+		Coroutine<?, ?> cImplicit =
 			first(run(() -> from(1).to(10).forEach(Math::sqrt)));
+
+		Coroutine<?, ?> cIterating =
+			first(supply(() -> from(1).to(10))).then(
+				forEach(consume(i -> Math.sqrt(i))));
 
 		Profiler	   p	  = new Profiler("Parallel Coroutine Execution");
 		CountDownLatch signal = new CountDownLatch(THREAD_COUNT);
@@ -63,11 +70,12 @@ public class ParallelExecution
 			new Thread(
 				() ->
 			{
-				launch(scope ->
-				{
-					cr.runBlocking(scope);
-					signal.countDown();
-				});
+				launch(
+					scope ->
+					{
+						cIterating.runBlocking(scope);
+						signal.countDown();
+					});
 			}).start();
 		}
 
@@ -80,18 +88,29 @@ public class ParallelExecution
 			throw new CoroutineException(e);
 		}
 
-		p.measure(THREAD_COUNT + " Threads");
+		p.measure(String.format("%,9d Threads", THREAD_COUNT));
 
 		launch(
 			scope ->
 		{
 			for (int i = 0; i < COROUTINE_COUNT; i++)
 			{
-				cr.runAsync(scope, null);
+				cImplicit.runAsync(scope, null);
 			}
 		});
 
-		p.measure(COROUTINE_COUNT + " Coroutines");
+		p.measure(String.format("%,9d iterating Coroutines", COROUTINE_COUNT));
+
+		launch(
+			scope ->
+		{
+			for (int i = 0; i < COROUTINE_COUNT; i++)
+			{
+				cIterating.runAsync(scope, null);
+			}
+		});
+
+		p.measure(String.format("%,9d implicit  Coroutines", COROUTINE_COUNT));
 		p.printSummary();
 	}
 }
