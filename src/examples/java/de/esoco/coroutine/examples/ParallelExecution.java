@@ -99,7 +99,7 @@ public class ParallelExecution
 			}
 		});
 
-		p.measure(String.format("%,9d iterating Coroutines", COROUTINE_COUNT));
+		p.measure(String.format("%,9d implicit  Coroutines", COROUTINE_COUNT));
 
 		launch(
 			scope ->
@@ -110,7 +110,7 @@ public class ParallelExecution
 			}
 		});
 
-		p.measure(String.format("%,9d implicit  Coroutines", COROUTINE_COUNT));
+		p.measure(String.format("%,9d iterating Coroutines", COROUTINE_COUNT));
 		p.printSummary();
 	}
 }
