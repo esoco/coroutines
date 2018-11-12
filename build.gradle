@@ -11,14 +11,6 @@ repositories
     jcenter()
 }
 
-tasks.withType(JavaCompile) {
-	// enable compilation of internal sun classes
-	// see http://stackoverflow.com/questions/12554829/
-    options.compilerArgs << '-XDignore.symbol.file'
-    options.fork = true
-    options.forkOptions.executable = 'javac'
-}
-
 dependencies
 {
  	if (project(':objectrelations').getProjectDir().exists())
