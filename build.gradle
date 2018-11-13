@@ -19,7 +19,7 @@ dependencies
 	}
 	else
 	{
-		compile 'org.obrel:objectrelations:1.3.+'
+		compile 'org.obrel:objectrelations:1.3.0'
 	}
 
     testCompile 'junit:junit:4.+'
