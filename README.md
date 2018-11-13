@@ -11,6 +11,34 @@ dependencies {
 }
 ```
 
+When using Maven it is necessary to define the JCenter repository. Furthermore, because of an incompatibility with Gradle wildcard versions it is currently necessary to explicitly declare the transitive dependencies of the project in Maven. This will be fixed in the next release. The pom.xml currently needs to contain the following entries:
+
+```xml
+<repositories>
+    <repository>
+      <id>jcenter</id>
+      <url>https://jcenter.bintray.com/</url>
+    </repository>
+</repositories>
+<dependencies>
+    <dependency>
+    <groupId>de.esoco</groupId>
+    <artifactId>coroutines</artifactId>
+    <version>0.9.0</version>
+    </dependency>
+    <dependency>
+    <groupId>org.obrel</groupId>
+    <artifactId>objectrelations</artifactId>
+    <version>1.3.0</version>
+    </dependency>
+    <dependency>
+    <groupId>de.esoco</groupId>
+    <artifactId>esoco-common</artifactId>
+    <version>1.2.0</version>
+    </dependency>
+</dependencies> 
+```
+
 The following gives only a short overview of how to use this project. More detailed information can be found on our [documentation site](https://esoco.gitbook.io/sdack/coroutines/introduction) and in the [generated javadoc](https://esoco.github.io/coroutines/javadoc/).
 
 ## Declaring Coroutines
