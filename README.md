@@ -3,7 +3,14 @@
 Travis build status:  
 [![Build Status](https://www.travis-ci.org/esoco/coroutines.svg?branch=master)](https://www.travis-ci.org/esoco/coroutines)
 
-This project contains a pure Java implementation of coroutines. I has a single dependency to the [ObjectRelations project](https://github.com/esoco/objectrelations). It can be build locally after cloning by starting a gradle build with `gradlew build`. To include coroutines into a project, add the dependency to your project. In gradle it would look like this:
+This project contains a pure Java implementation of coroutines. I has a single dependency to the [ObjectRelations project](https://github.com/esoco/objectrelations). 
+
+It can be build locally after cloning by starting a gradle build with `gradlew build`. 
+
+## Usage
+To include coroutines into a project, add the dependency to your project. 
+
+### Gradle
 
 ```gradle
 dependencies {
@@ -11,32 +18,41 @@ dependencies {
 }
 ```
 
+### Maven
 When using Maven it is necessary to define the JCenter repository. Furthermore, because of an incompatibility with Gradle wildcard versions it is currently necessary to explicitly declare the transitive dependencies of the project in Maven. This will be fixed in the next release. The pom.xml currently needs to contain the following entries:
 
 ```xml
 <repositories>
     <repository>
-      <id>jcenter</id>
-      <url>https://jcenter.bintray.com/</url>
+        <id>jcenter</id>
+        <url>https://jcenter.bintray.com/</url>
     </repository>
 </repositories>
+
+<properties>
+    <esoco.common.version>1.2.0</esoco.common.version>
+    <esoco.objectrelations.version>1.3.0</esoco.objectrelations.version>
+    <esoco.coroutines.version>0.9.0</esoco.coroutines.version>
+</properties>
+
 <dependencies>
     <dependency>
-    <groupId>de.esoco</groupId>
-    <artifactId>coroutines</artifactId>
-    <version>0.9.0</version>
+        <groupId>de.esoco</groupId>
+        <artifactId>coroutines</artifactId>
+        <version>${esoco.coroutines.version}</version>
     </dependency>
     <dependency>
-    <groupId>org.obrel</groupId>
-    <artifactId>objectrelations</artifactId>
-    <version>1.3.0</version>
+        <groupId>org.obrel</groupId>
+        <artifactId>objectrelations</artifactId>
+        <version>${esoco.objectrelations.version}</version>
     </dependency>
     <dependency>
-    <groupId>de.esoco</groupId>
-    <artifactId>esoco-common</artifactId>
-    <version>1.2.0</version>
+        <groupId>de.esoco</groupId>
+        <artifactId>esoco-common</artifactId>
+        <version>${esoco.common.version}</version>
     </dependency>
-</dependencies> 
+</dependencies>
+
 ```
 
 The following gives only a short overview of how to use this project. More detailed information can be found on our [documentation site](https://esoco.gitbook.io/sdack/coroutines/introduction) and in the [generated javadoc](https://esoco.github.io/coroutines/javadoc/).
