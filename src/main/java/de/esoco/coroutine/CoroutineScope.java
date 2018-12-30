@@ -164,10 +164,9 @@ public class CoroutineScope extends CoroutineEnvironment
 	/***************************************
 	 * Launches a new scope that is expected to produce a result and returns a
 	 * {@link Future} instance that can be used to query the result. The result
-	 * must be stored by the scope code in a relation of the scope with the
-	 * given relation type. If only a future object is needed to manage a scope
-	 * execution the relation type can be NULL, in which case the future result
-	 * will also be NULL.
+	 * will be retrieved after the coroutine execution finished from the scope
+	 * by applying the result function. If the future object is only needed to
+	 * wrap a scope execution this function
 	 *
 	 * @param  rContext   The coroutine context for the scope
 	 * @param  fGetResult A function that retrieves the result from the scope or
