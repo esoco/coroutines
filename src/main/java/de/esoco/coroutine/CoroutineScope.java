@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ public class CoroutineScope extends CoroutineEnvironment
 
 	private CoroutineContext rContext;
 
-	private final AtomicLong nRunningCoroutines = new AtomicLong();
+	private final AtomicLong aRunningCoroutines = new AtomicLong();
 	private final RunLock    aScopeLock		    = new RunLock();
 	private CountDownLatch   aFinishSignal	    = new CountDownLatch(1);
 
@@ -131,6 +131,7 @@ public class CoroutineScope extends CoroutineEnvironment
 		try
 		{
 			rCode.runIn(aScope);
+
 			aScope.await();
 		}
 		catch (Exception e)
@@ -198,7 +199,10 @@ public class CoroutineScope extends CoroutineEnvironment
 	{
 		try
 		{
-			aFinishSignal.await();
+			if (getCoroutineCount() > 0)
+			{
+				aFinishSignal.await();
+			}
 		}
 		catch (InterruptedException e)
 		{
@@ -307,7 +311,7 @@ public class CoroutineScope extends CoroutineEnvironment
 	 */
 	public long getCoroutineCount()
 	{
-		return nRunningCoroutines.get();
+		return aRunningCoroutines.get();
 	}
 
 	/***************************************
@@ -401,7 +405,7 @@ public class CoroutineScope extends CoroutineEnvironment
 		return String.format(
 			"%s[%d]",
 			getClass().getSimpleName(),
-			nRunningCoroutines);
+			aRunningCoroutines.longValue());
 	}
 
 	/***************************************
@@ -474,7 +478,7 @@ public class CoroutineScope extends CoroutineEnvironment
 	 */
 	void coroutineFinished(Continuation<?> rContinuation)
 	{
-		if (nRunningCoroutines.decrementAndGet() == 0)
+		if (aRunningCoroutines.decrementAndGet() == 0)
 		{
 			aFinishSignal.countDown();
 		}
@@ -487,7 +491,7 @@ public class CoroutineScope extends CoroutineEnvironment
 	 */
 	void coroutineStarted(Continuation<?> rContinuation)
 	{
-		if (nRunningCoroutines.incrementAndGet() == 1 &&
+		if (aRunningCoroutines.incrementAndGet() == 1 &&
 			aFinishSignal.getCount() == 0)
 		{
 			aFinishSignal = new CountDownLatch(1);

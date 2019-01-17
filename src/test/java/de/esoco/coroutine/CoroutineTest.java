@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -177,6 +177,27 @@ public class CoroutineTest
 	}
 
 	/***************************************
+	 * Test of {@link
+	 * CoroutineScope#launch(de.esoco.coroutine.CoroutineScope.ScopeCode)} with
+	 * an empty scope that doesn't execute coroutines.
+	 */
+	@Test
+	public void testEmptyScope()
+	{
+		launch(scope ->{});
+
+		try
+		{
+			launch(scope -> { throw new Exception("TEST"); });
+			fail();
+		}
+		catch (Exception e)
+		{
+			// expected
+		}
+	}
+
+	/***************************************
 	 * Test of coroutine error handling.
 	 */
 	@Test
@@ -346,6 +367,21 @@ public class CoroutineTest
 				assertTrue(ca.isFinished());
 				assertTrue(cb.isFinished());
 			});
+	}
+
+	/***************************************
+	 * Test of {@link Coroutine#toString()} and {@link
+	 * CoroutineScope#toString()}.
+	 */
+	@Test
+	public void testToString()
+	{
+		Coroutine<String, String> cr =
+			Coroutine.first(apply((String s) -> s.toUpperCase()));
+
+		assertEquals("Coroutine[CodeExecution -> FinishStep]", cr.toString());
+
+		launch(scope -> assertEquals("CoroutineScope[0]", scope.toString()));
 	}
 
 	/***************************************
