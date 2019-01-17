@@ -14,12 +14,12 @@ To include coroutines into a project, add the dependency to your project.
 
 ```gradle
 dependencies {
-	compile 'de.esoco:coroutines:0.9.0'
+	compile 'de.esoco:coroutines:0.9.1'
 }
 ```
 
 ### Maven
-When using Maven it is necessary to define the JCenter repository. Furthermore, because of an incompatibility with Gradle wildcard versions it is currently necessary to explicitly declare the transitive dependencies of the project in Maven. This will be fixed in the next release. The pom.xml currently needs to contain the following entries:
+When using Maven it is necessary to define the JCenter repository. Furthermore, because of an incompatibility with Gradle wildcard versions it is currently necessary to explicitly declare the transitive dependencies of the project in Maven. This will be fixed in a future release. The pom.xml currently needs to contain the following entries:
 
 ```xml
 <repositories>
@@ -32,7 +32,7 @@ When using Maven it is necessary to define the JCenter repository. Furthermore, 
 <properties>
     <esoco.common.version>1.2.0</esoco.common.version>
     <esoco.objectrelations.version>1.3.0</esoco.objectrelations.version>
-    <esoco.coroutines.version>0.9.0</esoco.coroutines.version>
+    <esoco.coroutines.version>0.9.1</esoco.coroutines.version>
 </properties>
 
 <dependencies>
