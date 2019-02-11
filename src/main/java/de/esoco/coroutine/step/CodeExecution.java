@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -99,25 +99,27 @@ public class CodeExecution<I, O> extends CoroutineStep<I, O>
 	}
 
 	/***************************************
-	 * Consumes the input value with a {@link Consumer} and creates no result.
+	 * Consumes the input value with a {@link Consumer} and returns the input
+	 * value.
 	 *
 	 * @param  fCode The consumer to be executed
 	 *
 	 * @return A new instance of this class
 	 */
-	public static <T> CodeExecution<T, Void> consume(Consumer<T> fCode)
+	public static <T> CodeExecution<T, T> consume(Consumer<T> fCode)
 	{
 		return new CodeExecution<>(Functions.asFunction(fCode));
 	}
 
 	/***************************************
-	 * Consumes the input value with a {@link Consumer} and creates no result.
+	 * Consumes the input value with a {@link Consumer} and returns the input
+	 * value.
 	 *
 	 * @param  fCode The consumer to be executed
 	 *
 	 * @return A new instance of this class
 	 */
-	public static <T> CodeExecution<T, Void> consume(
+	public static <T> CodeExecution<T, T> consume(
 		BiConsumer<T, Continuation<?>> fCode)
 	{
 		return new CodeExecution<>(Functions.asFunction(fCode));
