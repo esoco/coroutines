@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ import org.obrel.core.ObjectRelations;
 import org.obrel.core.RelatedObject;
 import org.obrel.type.MetaTypes;
 
+import static org.obrel.filter.RelationFilters.ifTypeNot;
+import static org.obrel.type.MetaTypes.IMMUTABLE;
 import static org.obrel.type.StandardTypes.NAME;
 
 
@@ -464,7 +466,7 @@ public class Coroutine<I, O> extends RelatedObject
 				rOther,
 				this,
 				true,
-				r -> r.getType() != MetaTypes.IMMUTABLE);
+				ifTypeNot(IMMUTABLE));
 		}
 	}
 
