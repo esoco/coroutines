@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
@@ -49,18 +48,8 @@ import static org.obrel.type.StandardTypes.NAME;
 /********************************************************************
  * A continuation represents the state of a coroutine execution. It can be used
  * to carry state between coroutine execution steps by setting relations on it.
- * The method {@link Coroutine#then(CoroutineStep)} gives the code of a step
- * access to the current continuation it is running in.
- *
- * <p>This class also implements the {@link Future} interface and can therefore
- * be used like any other Java future. The only limitation is that due to the
- * cooperative concurrency of coroutines it is not possible to immediately
- * interrupt a coroutine execution. Therefore the boolean parameter of the
- * method {@link #cancel()} is ignored.</p>
- *
- * <p>If a continuation has been cancelled all blocking {@link Future} methods
- * will throw a {@link CancellationException} after the wait lock is
- * removed.</p>
+ * Each {@link CoroutineStep} receives the continuation of it's execution as an
+ * argument to it's execution methods.
  *
  * @author eso
  */
