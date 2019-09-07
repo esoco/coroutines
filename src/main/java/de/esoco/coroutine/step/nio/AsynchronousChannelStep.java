@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -180,7 +180,7 @@ public abstract class AsynchronousChannelStep<I, O> extends CoroutineStep<I, O>
 		 * @param rChannel    The channel to operate on
 		 * @param rSuspension The suspension to be resumed when the operation is
 		 *                    completed
-		 * @param fOperation  The asychronous channel operation to perform
+		 * @param fOperation  The asynchronous channel operation to perform
 		 */
 		protected ChannelCallback(C						 rChannel,
 								  Suspension<ByteBuffer> rSuspension,
