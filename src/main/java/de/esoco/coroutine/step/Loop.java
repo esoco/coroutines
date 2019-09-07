@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -114,7 +114,8 @@ public class Loop<T> extends CoroutineStep<T, T>
 						 CoroutineStep<T, ?>  rNextStep,
 						 Continuation<?>	  rContinuation)
 	{
-		fPreviousExecution.thenAcceptAsync(
+		rContinuation.continueAccept(
+			fPreviousExecution,
 			i -> loopAsync(i, rNextStep, rContinuation));
 	}
 
@@ -147,11 +148,11 @@ public class Loop<T> extends CoroutineStep<T, T>
 	{
 		if (pCondition.test(rInput, rContinuation))
 		{
-			CompletableFuture<T> fRunLoop =
+			CompletableFuture<T> fLoopIteration =
 				CompletableFuture.supplyAsync(() -> rInput, rContinuation);
 
 			rLoopedStep.runAsync(
-				fRunLoop,
+				fLoopIteration,
 				consume(i -> loopAsync(i, rNextStep, rContinuation)),
 				rContinuation);
 		}

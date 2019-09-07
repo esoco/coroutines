@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -174,7 +174,8 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 						 CoroutineStep<Collection<O>, ?> rNextStep,
 						 Continuation<?>				 rContinuation)
 	{
-		fPreviousExecution.thenAcceptAsync(
+		rContinuation.continueAccept(
+			fPreviousExecution,
 			rInput -> collectAsync(rInput, rNextStep, rContinuation));
 	}
 

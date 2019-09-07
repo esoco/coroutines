@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.obrel.core.Relatable;
 import org.obrel.core.RelatedObject;
@@ -186,6 +187,41 @@ public class Continuation<T> extends RelatedObject implements Executor
 	public final CoroutineContext context()
 	{
 		return rScope.context();
+	}
+
+	/***************************************
+	 * Continues the execution of a {@link CompletableFuture} by consuming it's
+	 * result. Coroutine steps must always invoke a continue method to progress
+	 * to a subsequent step and not use the methods of the future directly.
+	 *
+	 * @param  rFuture The future to continue
+	 * @param  fNext   The next code to execute
+	 *
+	 * @return The resulting {@link CompletableFuture} chain
+	 */
+	public final <V> CompletableFuture<Void> continueAccept(
+		CompletableFuture<V> rFuture,
+		Consumer<V>			 fNext)
+	{
+		return rFuture.thenAcceptAsync(fNext, this);
+	}
+
+	/***************************************
+	 * Continues the execution of a {@link CompletableFuture} by applying a
+	 * function to it's result. Coroutine steps must always invoke a continue
+	 * method to progress to a subsequent step and not use the methods of the
+	 * future directly.
+	 *
+	 * @param  rFuture The future to continue
+	 * @param  fNext   The next code to execute
+	 *
+	 * @return The resulting {@link CompletableFuture} chain
+	 */
+	public final <I, O> CompletableFuture<O> continueApply(
+		CompletableFuture<I> rFuture,
+		Function<I, O>		 fNext)
+	{
+		return rFuture.thenApplyAsync(fNext, this);
 	}
 
 	/***************************************
@@ -559,6 +595,23 @@ public class Continuation<T> extends RelatedObject implements Executor
 			});
 
 		return this;
+	}
+
+	/***************************************
+	 * .
+	 *
+	 * @param rResumeStep The step to resume execution at
+	 * @param rValue      The value to start the coroutine with
+	 */
+	public final <T> void resumeAsync(CoroutineStep<T, ?> rResumeStep, T rValue)
+	{
+		CompletableFuture<T> aResumeFuture =
+			CompletableFuture.supplyAsync(() -> rValue, this);
+
+		// the resume step is always either a StepChain which contains it's
+		// own next step or the final step in a coroutine and therefore
+		// rNextStep can be NULL
+		rResumeStep.runAsync(aResumeFuture, null, this);
 	}
 
 	/***************************************

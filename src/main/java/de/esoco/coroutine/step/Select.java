@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -179,11 +179,11 @@ public class Select<I, O> extends CoroutineStep<I, O>
 						 CoroutineStep<O, ?>  rNextStep,
 						 Continuation<?>	  rContinuation)
 	{
-		fPreviousExecution.thenAcceptAsync(
-				  			rInput ->
-				  				selectAsync(rInput, rNextStep, rContinuation))
-						  .exceptionally(t ->
-				  				rContinuation.fail(t));
+		rContinuation.continueAccept(
+			 			fPreviousExecution,
+			 			rInput ->
+			 				selectAsync(rInput, rNextStep, rContinuation))
+					 .exceptionally(t -> rContinuation.fail(t));
 	}
 
 	/***************************************

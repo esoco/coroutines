@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -87,13 +87,12 @@ public class ChannelReceive<T> extends ChannelStep<Void, T>
 						 CoroutineStep<T, ?>	 rNextStep,
 						 Continuation<?>		 rContinuation)
 	{
-		fPreviousExecution.thenAcceptAsync(
-				  			rVoid ->
-				  				getChannel(rContinuation).receiveSuspending(
-				  					rContinuation.suspend(this, rNextStep)),
-				  			rContinuation)
-						  .exceptionally(t ->
-				  				rContinuation.fail(t));
+		rContinuation.continueAccept(
+			 			fPreviousExecution,
+			 			rVoid ->
+			 				getChannel(rContinuation).receiveSuspending(
+			 					rContinuation.suspend(this, rNextStep)))
+					 .exceptionally(t -> rContinuation.fail(t));
 	}
 
 	/***************************************

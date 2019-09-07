@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -103,9 +103,9 @@ public abstract class AsynchronousSocketStep
 						 CoroutineStep<ByteBuffer, ?>  rNextStep,
 						 Continuation<?>			   rContinuation)
 	{
-		fPreviousExecution.thenAcceptAsync(
-			b -> connectAsync(b, rContinuation.suspend(this, rNextStep)),
-			rContinuation);
+		rContinuation.continueAccept(
+			fPreviousExecution,
+			b -> connectAsync(b, rContinuation.suspend(this, rNextStep)));
 	}
 
 	/***************************************

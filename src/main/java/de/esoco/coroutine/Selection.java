@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import de.esoco.lib.concurrent.RunLock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 
@@ -297,10 +296,7 @@ public class Selection<T, V, R> extends Suspension<T>
 			(R) (bSingleValue ? (aResults.size() >= 1 ? aResults.get(0)
 													  : null) : aResults);
 
-		rResumeSelectionStep.runAsync(
-			CompletableFuture.supplyAsync(() -> rResult, continuation()),
-			null,
-			continuation());
+		continuation().resumeAsync(rResumeSelectionStep, rResult);
 	}
 
 	/***************************************

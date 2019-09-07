@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -137,7 +137,8 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 		C aResults =
 			fCollectionFactory != null ? fCollectionFactory.get() : null;
 
-		fPreviousExecution.thenAcceptAsync(
+		rContinuation.continueAccept(
+			fPreviousExecution,
 			i -> iterateAsync(i.iterator(), aResults, rNextStep, rContinuation));
 	}
 
@@ -179,13 +180,13 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	{
 		if (rIterator.hasNext())
 		{
-			CompletableFuture<T> fGetNextValue =
+			CompletableFuture<T> fNextIteration =
 				CompletableFuture.supplyAsync(
 					() -> rIterator.next(),
 					rContinuation);
 
 			rProcessingStep.runAsync(
-				fGetNextValue,
+				fNextIteration,
 				consume(
 					o ->
 					{

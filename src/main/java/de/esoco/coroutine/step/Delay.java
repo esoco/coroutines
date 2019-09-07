@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -127,25 +127,22 @@ public class Delay<T> extends CoroutineStep<T, T>
 						 CoroutineStep<T, ?>  rNextStep,
 						 Continuation<?>	  rContinuation)
 	{
-		fPreviousExecution.thenAcceptAsync(
-				  			v ->
-				  			{
-				  				Pair<Long, TimeUnit> rDuration =
-				  					fGetDuration.apply(rContinuation);
+		rContinuation.continueAccept(
+			 			fPreviousExecution,
+			 			v ->
+			 			{
+			 				Pair<Long, TimeUnit> rDuration =
+			 					fGetDuration.apply(rContinuation);
 
-				  				rContinuation.context()
-				  				.getScheduler()
-				  				.schedule(
-				  					() ->
-				  						rContinuation.suspend(
-				  							this,
-				  							rNextStep)
-				  						.resume(v),
-				  					rDuration.first(),
-				  					rDuration.second());
-				  			},
-				  			rContinuation)
-						  .exceptionally(t ->
-				  				rContinuation.fail(t));
+			 				rContinuation.context()
+			 				.getScheduler()
+			 				.schedule(
+			 					() ->
+			 						rContinuation.suspend(this, rNextStep)
+			 						.resume(v),
+			 					rDuration.first(),
+			 					rDuration.second());
+			 			}).exceptionally(t ->
+			 				rContinuation.fail(t));
 	}
 }

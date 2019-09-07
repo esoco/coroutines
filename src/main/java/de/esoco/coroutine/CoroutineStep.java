@@ -1,6 +1,6 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // This file is a part of the 'coroutines' project.
-// Copyright 2018 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
+// Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -97,9 +97,9 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 						 Continuation<?>	  rContinuation)
 	{
 		CompletableFuture<O> fExecution =
-			fPreviousExecution.thenApplyAsync(
-				i -> execute(i, rContinuation),
-				rContinuation);
+			rContinuation.continueApply(
+				fPreviousExecution,
+				i -> execute(i, rContinuation));
 
 		if (rNextStep != null)
 		{
