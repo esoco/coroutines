@@ -64,11 +64,12 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 	private final CoroutineScope rScope;
 
-	private final long nId		  = aNextId.getAndIncrement();
-	private T		   rResult    = null;
-	private boolean    bCancelled = false;
-	private boolean    bFinished  = false;
-	private Throwable  eError     = null;
+	private final long nId				  = aNextId.getAndIncrement();
+	private T		   rResult			  = null;
+	private boolean    bCallChainComplete = false;
+	private boolean    bCancelled		  = false;
+	private boolean    bFinished		  = false;
+	private Throwable  eError			  = null;
 
 	private CompletableFuture<?> rCurrentExecution  = null;
 	private Suspension<?>		 rCurrentSuspension = null;
@@ -179,6 +180,14 @@ public class Continuation<T> extends RelatedObject implements Executor
 		{
 			rCurrentSuspension.cancel();
 		}
+
+		if (bCallChainComplete && rCurrentExecution != null)
+		{
+			// only cancel last CompletableFuture in a chain to avoid
+			// state-locking for each step execution which would be necessary
+			// as canceling typically occurs from a separate thread
+			rCurrentExecution.cancel(false);
+		}
 	}
 
 	/***************************************
@@ -251,6 +260,9 @@ public class Continuation<T> extends RelatedObject implements Executor
 			{
 				// only add exception handler to the end of a chain, i.e. next == null
 				rNextExecution.exceptionally(this::fail);
+
+				// and signal that no more steps will be executed
+				bCallChainComplete = true;
 			}
 		}
 		else if (rCurrentExecution != null)
@@ -727,14 +739,6 @@ public class Continuation<T> extends RelatedObject implements Executor
 			getCurrentCoroutine().get(NAME),
 			nId,
 			rResult);
-	}
-
-	/***************************************
-	 * Internal method to signal the completion of the call chain, i.e. the
-	 * final step has been added to it (but not necessarily executed).
-	 */
-	void callChainComplete()
-	{
 	}
 
 	/***************************************
