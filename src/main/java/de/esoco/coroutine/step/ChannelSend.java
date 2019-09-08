@@ -91,12 +91,9 @@ public class ChannelSend<T> extends ChannelStep<T, T>
 						 Continuation<?>	  rContinuation)
 	{
 		rContinuation.continueAccept(
-			 			fPreviousExecution,
-			 			v ->
-			 				getChannel(rContinuation).sendSuspending(
-			 					rContinuation.suspend(this, rNextStep)
-			 					.withValue(v)))
-					 .exceptionally(t -> rContinuation.fail(t));
+			fPreviousExecution,
+			v -> getChannel(rContinuation).sendSuspending(
+					rContinuation.suspend(this, rNextStep).withValue(v)));
 	}
 
 	/***************************************

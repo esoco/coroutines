@@ -96,23 +96,10 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 						 CoroutineStep<O, ?>  rNextStep,
 						 Continuation<?>	  rContinuation)
 	{
-		CompletableFuture<O> fExecution =
-			rContinuation.continueApply(
-				fPreviousExecution,
-				i -> execute(i, rContinuation));
-
-		if (rNextStep != null)
-		{
-			// the next step is either a StepChain which contains it's own
-			// next step or the final step in a coroutine and therefore the
-			// rNextStep argument can be NULL
-			rNextStep.runAsync(fExecution, null, rContinuation);
-		}
-		else
-		{
-			// only add exception handler to the end of a chain, i.e. next == null
-			fExecution.exceptionally(e -> fail(e, rContinuation));
-		}
+		rContinuation.continueApply(
+			fPreviousExecution,
+			i -> execute(i, rContinuation),
+			rNextStep);
 	}
 
 	/***************************************
@@ -148,25 +135,6 @@ public abstract class CoroutineStep<I, O> extends RelatedObject
 	 * @return The result of the execution
 	 */
 	protected abstract O execute(I rInput, Continuation<?> rContinuation);
-
-	/***************************************
-	 * Signals an execution failure to the given continuation. This method
-	 * should be invoked by subclasses the encounter an exception during
-	 * execution. The return value is always NULL but the method signature is
-	 * suitable to be used for invocation in a lambda expression as the argument
-	 * to {@link CompletableFuture#exceptionally(java.util.function.Function)}.
-	 *
-	 * @param  eError        The exception that occurred
-	 * @param  rContinuation The continuation
-	 *
-	 * @return Always NULL, but with the type of the coroutine result
-	 */
-	protected O fail(Throwable eError, Continuation<?> rContinuation)
-	{
-		rContinuation.fail(eError);
-
-		return null;
-	}
 
 	/***************************************
 	 * Allow subclasses to terminate the coroutine they currently run in.

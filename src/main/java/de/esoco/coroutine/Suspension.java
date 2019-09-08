@@ -67,8 +67,7 @@ public class Suspension<T>
 
 	/***************************************
 	 * Cancels this suspension. This will {@link Continuation#cancel() cancel}
-	 * the continuation. Tries to resuming a cancelled suspension will be
-	 * ignored.
+	 * the continuation. Tries to resume a cancelled suspension will be ignored.
 	 */
 	public void cancel()
 	{

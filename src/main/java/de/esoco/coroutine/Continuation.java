@@ -64,12 +64,14 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 	private final CoroutineScope rScope;
 
-	private final long    nId				 = aNextId.getAndIncrement();
-	private T			  rResult			 = null;
-	private boolean		  bCancelled		 = false;
-	private boolean		  bFinished			 = false;
-	private Throwable     eError			 = null;
-	private Suspension<?> rCurrentSuspension = null;
+	private final long nId		  = aNextId.getAndIncrement();
+	private T		   rResult    = null;
+	private boolean    bCancelled = false;
+	private boolean    bFinished  = false;
+	private Throwable  eError     = null;
+
+	private CompletableFuture<?> rCurrentExecution  = null;
+	private Suspension<?>		 rCurrentSuspension = null;
 
 	private Consumer<Continuation<T>> fRunWhenDone;
 	private Consumer<Continuation<T>> fRunOnCancel;
@@ -191,37 +193,70 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 	/***************************************
 	 * Continues the execution of a {@link CompletableFuture} by consuming it's
-	 * result. Coroutine steps must always invoke a continue method to progress
-	 * to a subsequent step and not use the methods of the future directly.
+	 * result. This is typically done by suspending steps that resume the
+	 * coroutine execution later. Coroutine steps must always invoke a continue
+	 * method to progress to a subsequent step and not use the methods of the
+	 * future directly.
 	 *
-	 * @param  rFuture The future to continue
-	 * @param  fNext   The next code to execute
-	 *
-	 * @return The resulting {@link CompletableFuture} chain
+	 * @param rPreviousExecution The future to continue
+	 * @param fNext              The next code to execute
 	 */
-	public final <V> CompletableFuture<Void> continueAccept(
-		CompletableFuture<V> rFuture,
+	public final <V> void continueAccept(
+		CompletableFuture<V> rPreviousExecution,
 		Consumer<V>			 fNext)
 	{
-		return rFuture.thenAcceptAsync(fNext, this);
+		if (!bCancelled)
+		{
+			rCurrentExecution =
+				rPreviousExecution.thenAcceptAsync(fNext, this)
+								  .exceptionally(this::fail);
+		}
+		else if (rCurrentExecution != null)
+		{
+			rCurrentExecution.cancel(false);
+		}
 	}
 
 	/***************************************
 	 * Continues the execution of a {@link CompletableFuture} by applying a
-	 * function to it's result. Coroutine steps must always invoke a continue
+	 * function to it's result and then either invoking the next step in a chain
+	 * or finish the execution. Coroutine steps must always invoke a continue
 	 * method to progress to a subsequent step and not use the methods of the
 	 * future directly.
 	 *
-	 * @param  rFuture The future to continue
-	 * @param  fNext   The next code to execute
-	 *
-	 * @return The resulting {@link CompletableFuture} chain
+	 * @param rPreviousExecution The future to continue
+	 * @param fNext              The next code to execute
+	 * @param rNextStep          The next step
 	 */
-	public final <I, O> CompletableFuture<O> continueApply(
-		CompletableFuture<I> rFuture,
-		Function<I, O>		 fNext)
+	public final <I, O> void continueApply(
+		CompletableFuture<I> rPreviousExecution,
+		Function<I, O>		 fNext,
+		CoroutineStep<O, ?>  rNextStep)
 	{
-		return rFuture.thenApplyAsync(fNext, this);
+		if (!bCancelled)
+		{
+			CompletableFuture<O> rNextExecution =
+				rPreviousExecution.thenApplyAsync(fNext, this);
+
+			rCurrentExecution = rNextExecution;
+
+			if (rNextStep != null)
+			{
+				// the next step is either a StepChain which contains it's own
+				// next step or the final step in a coroutine and therefore the
+				// rNextStep argument can be NULL
+				rNextStep.runAsync(rNextExecution, null, this);
+			}
+			else
+			{
+				// only add exception handler to the end of a chain, i.e. next == null
+				rNextExecution.exceptionally(this::fail);
+			}
+		}
+		else if (rCurrentExecution != null)
+		{
+			rCurrentExecution.cancel(false);
+		}
 	}
 
 	/***************************************
@@ -261,11 +296,11 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 *
 	 * @param  eError The exception that caused the error
 	 *
-	 * @return Declared as Void so that it can be used in calls to {@link
-	 *         CompletableFuture#exceptionally(Function)} without the need to
-	 *         return a (NULL) value
+	 * @return Always NULL but declared with a generic type so that it can be
+	 *         used directly as a functional argument to {@link
+	 *         CompletableFuture#exceptionally(Function)}
 	 */
-	public Void fail(Throwable eError)
+	public <O> O fail(Throwable eError)
 	{
 		if (!bFinished)
 		{
@@ -603,15 +638,24 @@ public class Continuation<T> extends RelatedObject implements Executor
 	 * @param rResumeStep The step to resume execution at
 	 * @param rValue      The value to start the coroutine with
 	 */
-	public final <T> void resumeAsync(CoroutineStep<T, ?> rResumeStep, T rValue)
+	public final <V> void resumeAsync(CoroutineStep<V, ?> rResumeStep, V rValue)
 	{
-		CompletableFuture<T> aResumeFuture =
-			CompletableFuture.supplyAsync(() -> rValue, this);
+		if (!bCancelled)
+		{
+			CompletableFuture<V> aResumeExecution =
+				CompletableFuture.supplyAsync(() -> rValue, this);
 
-		// the resume step is always either a StepChain which contains it's
-		// own next step or the final step in a coroutine and therefore
-		// rNextStep can be NULL
-		rResumeStep.runAsync(aResumeFuture, null, this);
+			rCurrentExecution = aResumeExecution;
+
+			// the resume step is always either a StepChain which contains it's
+			// own next step or the final step in a coroutine and therefore
+			// rNextStep can be NULL
+			rResumeStep.runAsync(aResumeExecution, null, this);
+		}
+		else if (rCurrentExecution != null)
+		{
+			rCurrentExecution.cancel(false);
+		}
 	}
 
 	/***************************************
@@ -662,6 +706,7 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 		rScope.addSuspension(rSuspension);
 		rCurrentSuspension = rSuspension;
+		rCurrentExecution  = null;
 
 		if (fSuspensionListener != null)
 		{
@@ -682,6 +727,14 @@ public class Continuation<T> extends RelatedObject implements Executor
 			getCurrentCoroutine().get(NAME),
 			nId,
 			rResult);
+	}
+
+	/***************************************
+	 * Internal method to signal the completion of the call chain, i.e. the
+	 * final step has been added to it (but not necessarily executed).
+	 */
+	void callChainComplete()
+	{
 	}
 
 	/***************************************

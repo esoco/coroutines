@@ -180,10 +180,8 @@ public class Select<I, O> extends CoroutineStep<I, O>
 						 Continuation<?>	  rContinuation)
 	{
 		rContinuation.continueAccept(
-			 			fPreviousExecution,
-			 			rInput ->
-			 				selectAsync(rInput, rNextStep, rContinuation))
-					 .exceptionally(t -> rContinuation.fail(t));
+			fPreviousExecution,
+			rInput -> selectAsync(rInput, rNextStep, rContinuation));
 	}
 
 	/***************************************

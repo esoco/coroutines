@@ -88,11 +88,10 @@ public class ChannelReceive<T> extends ChannelStep<Void, T>
 						 Continuation<?>		 rContinuation)
 	{
 		rContinuation.continueAccept(
-			 			fPreviousExecution,
-			 			rVoid ->
-			 				getChannel(rContinuation).receiveSuspending(
-			 					rContinuation.suspend(this, rNextStep)))
-					 .exceptionally(t -> rContinuation.fail(t));
+			fPreviousExecution,
+			nothing ->
+				getChannel(rContinuation).receiveSuspending(
+					rContinuation.suspend(this, rNextStep)));
 	}
 
 	/***************************************

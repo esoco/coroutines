@@ -567,6 +567,19 @@ public class Coroutine<I, O> extends RelatedObject
 		 * {@inheritDoc}
 		 */
 		@Override
+		public void runAsync(CompletableFuture<T> fPreviousExecution,
+							 CoroutineStep<T, ?>  rNextStep,
+							 Continuation<?>	  rContinuation)
+		{
+			super.runAsync(fPreviousExecution, rNextStep, rContinuation);
+
+			rContinuation.callChainComplete();
+		}
+
+		/***************************************
+		 * {@inheritDoc}
+		 */
+		@Override
 		@SuppressWarnings("unchecked")
 		protected T execute(T rResult, Continuation<?> rContinuation)
 		{
@@ -667,7 +680,9 @@ public class Coroutine<I, O> extends RelatedObject
 				}
 				catch (Throwable e)
 				{
-					return fail(e, rContinuation);
+					rContinuation.fail(e);
+
+					return null;
 				}
 			}
 		}

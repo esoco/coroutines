@@ -128,21 +128,18 @@ public class Delay<T> extends CoroutineStep<T, T>
 						 Continuation<?>	  rContinuation)
 	{
 		rContinuation.continueAccept(
-			 			fPreviousExecution,
-			 			v ->
-			 			{
-			 				Pair<Long, TimeUnit> rDuration =
-			 					fGetDuration.apply(rContinuation);
+			fPreviousExecution,
+			v ->
+			{
+				Pair<Long, TimeUnit> rDuration =
+					fGetDuration.apply(rContinuation);
 
-			 				rContinuation.context()
-			 				.getScheduler()
-			 				.schedule(
-			 					() ->
-			 						rContinuation.suspend(this, rNextStep)
-			 						.resume(v),
-			 					rDuration.first(),
-			 					rDuration.second());
-			 			}).exceptionally(t ->
-			 				rContinuation.fail(t));
+				rContinuation.context()
+				.getScheduler()
+				.schedule(
+					() -> rContinuation.suspend(this, rNextStep).resume(v),
+					rDuration.first(),
+					rDuration.second());
+			});
 	}
 }
