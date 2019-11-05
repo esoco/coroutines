@@ -213,6 +213,8 @@ public class Suspension<T>
 
 	/***************************************
 	 * Resumes this suspension by asynchronously executing the resume step.
+	 *
+	 * @see Continuation#resumeAsync(CoroutineStep, Object)
 	 */
 	void resumeAsync()
 	{

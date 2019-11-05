@@ -285,7 +285,7 @@ public class Selection<T, V, R> extends Suspension<T>
 	/***************************************
 	 * Overridden to resume the selection result step instead.
 	 *
-	 * @see Suspension#resumeAsync(CompletableFuture, Continuation)
+	 * @see Continuation#resumeAsync(CoroutineStep, Object)
 	 */
 	@Override
 	void resumeAsync()

@@ -645,32 +645,6 @@ public class Continuation<T> extends RelatedObject implements Executor
 	}
 
 	/***************************************
-	 * .
-	 *
-	 * @param rResumeStep The step to resume execution at
-	 * @param rValue      The value to start the coroutine with
-	 */
-	public final <V> void resumeAsync(CoroutineStep<V, ?> rResumeStep, V rValue)
-	{
-		if (!bCancelled)
-		{
-			CompletableFuture<V> aResumeExecution =
-				CompletableFuture.supplyAsync(() -> rValue, this);
-
-			rCurrentExecution = aResumeExecution;
-
-			// the resume step is always either a StepChain which contains it's
-			// own next step or the final step in a coroutine and therefore
-			// rNextStep can be NULL
-			rResumeStep.runAsync(aResumeExecution, null, this);
-		}
-		else if (rCurrentExecution != null)
-		{
-			rCurrentExecution.cancel(false);
-		}
-	}
-
-	/***************************************
 	 * Returns the scope in which the coroutine is executed.
 	 *
 	 * @return The coroutine scope
@@ -776,6 +750,32 @@ public class Continuation<T> extends RelatedObject implements Executor
 
 			closeManagedResources(getCurrentCoroutine(), fErrorHandler);
 			closeManagedResources(this, fErrorHandler);
+		}
+	}
+
+	/***************************************
+	 * Resumes the asynchronous execution of this coroutine at a certain step.
+	 *
+	 * @param rResumeStep The step to resume execution at
+	 * @param rValue      The value to resume the step with
+	 */
+	final <V> void resumeAsync(CoroutineStep<V, ?> rResumeStep, V rValue)
+	{
+		if (!bCancelled)
+		{
+			CompletableFuture<V> aResumeExecution =
+				CompletableFuture.supplyAsync(() -> rValue, this);
+
+			rCurrentExecution = aResumeExecution;
+
+			// the resume step is always either a StepChain which contains it's
+			// own next step or the final step in a coroutine and therefore
+			// rNextStep can be NULL
+			rResumeStep.runAsync(aResumeExecution, null, this);
+		}
+		else if (rCurrentExecution != null)
+		{
+			rCurrentExecution.cancel(false);
 		}
 	}
 
