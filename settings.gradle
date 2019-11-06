@@ -9,9 +9,4 @@ buildscript {
 
 apply plugin: 'net.vivin.gradle-semantic-build-versioning'
 
-def baseProjects = [':esoco-common',':objectrelations']
-
-baseProjects.each { projectName ->
-	include projectName
-	project(projectName).projectDir = new File("../sdack/${projectName.substring(1)}")
-}
+includeFlat 'esoco-common', 'objectrelations'

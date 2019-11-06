@@ -1,4 +1,4 @@
-apply plugin: 'java'
+apply plugin: 'java-library'
 apply plugin: 'eclipse'
 
 project.group   = 'de.esoco'
@@ -10,18 +10,30 @@ repositories
     jcenter()
 }
 
+// substitute local project dependencies if available
+configurations.all {
+	resolutionStrategy.dependencySubstitution.all { DependencySubstitution dependency ->
+		if (dependency.requested instanceof ModuleComponentSelector &&
+			["org.obrel" ,"de.esoco"].contains(dependency.requested.group)) {
+			def targetProject = findProject(":${dependency.requested.module}")
+			if (targetProject != null) {
+				dependency.useTarget (targetProject, "prefer local project")
+				if (name.startsWith("compile")) // only log once
+					println "$project.name using local project $targetProject as dependency"
+			}
+		}
+	}
+}
+
 dependencies
 {
- 	if (project(':objectrelations').getProjectDir().exists())
-	{
-		compile project(':objectrelations')
-	}
-	else
-	{
-		compile 'org.obrel:objectrelations:1.4.0'
-	}
+	api 'org.obrel:objectrelations:1.4.1'
 
-    testCompile 'junit:junit:4.12'
+	testImplementation platform('org.junit:junit-bom:5.5.2')	
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testImplementation 'junit:junit:4.12'
+	
+	testRuntimeOnly 'org.junit.vintage:junit-vintage-engine' // JUnit4 support
 }
 
 task sourceJar(type: Jar, dependsOn: classes) {
