@@ -10,6 +10,6 @@ buildscript {
 apply plugin: 'net.vivin.gradle-semantic-build-versioning'
 
 ['esoco-common', 'objectrelations'].each {
-	project -> if (new File("../$project").exists()) includeFlat project
+	project -> if (new File("$rootDir/../$project").exists()) includeFlat project 
 }
 
