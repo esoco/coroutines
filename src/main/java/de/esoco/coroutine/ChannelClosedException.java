@@ -21,39 +21,36 @@ package de.esoco.coroutine;
  *
  * @author eso
  */
-public class ChannelClosedException extends CoroutineException
-{
-	//~ Static fields/initializers ---------------------------------------------
+public class ChannelClosedException extends CoroutineException {
+    //~ Static fields/initializers ---------------------------------------------
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	//~ Instance fields --------------------------------------------------------
+    //~ Instance fields --------------------------------------------------------
 
-	private final ChannelId<?> rChannelId;
+    private final ChannelId<?> rChannelId;
 
-	//~ Constructors -----------------------------------------------------------
+    //~ Constructors -----------------------------------------------------------
 
-	/***************************************
-	 * Creates a new instance.
-	 *
-	 * @param rId The channel ID
-	 */
-	public ChannelClosedException(ChannelId<?> rId)
-	{
-		super("Channel %s is closed", rId);
+    /***************************************
+     * Creates a new instance.
+     *
+     * @param rId The channel ID
+     */
+    public ChannelClosedException(ChannelId<?> rId) {
+        super("Channel %s is closed", rId);
 
-		rChannelId = rId;
-	}
+        rChannelId = rId;
+    }
 
-	//~ Methods ----------------------------------------------------------------
+    //~ Methods ----------------------------------------------------------------
 
-	/***************************************
-	 * Returns the channel id.
-	 *
-	 * @return The channel id
-	 */
-	public ChannelId<?> getChannelId()
-	{
-		return rChannelId;
-	}
+    /***************************************
+     * Returns the channel id.
+     *
+     * @return The channel id
+     */
+    public ChannelId<?> getChannelId() {
+        return rChannelId;
+    }
 }

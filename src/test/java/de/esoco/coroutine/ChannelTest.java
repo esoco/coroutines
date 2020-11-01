@@ -32,125 +32,106 @@ import static org.junit.Assert.fail;
 
 import static org.obrel.type.StandardTypes.NAME;
 
-
 /********************************************************************
  * Test of {@link Coroutine}.
  *
  * @author eso
  */
-public class ChannelTest
-{
-	//~ Static fields/initializers ---------------------------------------------
+public class ChannelTest {
+    //~ Static fields/initializers ---------------------------------------------
 
-	private static final ChannelId<String> TEST_CHANNEL =
-		stringChannel("TestChannel");
+    private static final ChannelId<String> TEST_CHANNEL =
+        stringChannel("TestChannel");
 
-	private static final Coroutine<String, String> SEND =
-		Coroutine.first(apply((String s) -> s + "test"))
-				 .then(send(TEST_CHANNEL))
-				 .with(NAME, "Send");
+    private static final Coroutine<String, String> SEND =
+        Coroutine.first(apply((String s) -> s + "test"))
+            .then(send(TEST_CHANNEL))
+            .with(NAME, "Send");
 
-	private static final Coroutine<?, String> RECEIVE =
-		Coroutine.first(receive(TEST_CHANNEL))
-				 .with(NAME, "Receive")
-				 .then(apply(s -> s.toUpperCase()));
+    private static final Coroutine<?, String> RECEIVE =
+        Coroutine.first(receive(TEST_CHANNEL))
+            .with(NAME, "Receive")
+            .then(apply(s -> s.toUpperCase()));
 
-	//~ Static methods ---------------------------------------------------------
+    //~ Static methods ---------------------------------------------------------
 
-	/***************************************
-	 * Test class setup.
-	 */
-	@BeforeClass
-	public static void setup()
-	{
-		// suppress stacktraces from error testing
-		Coroutines.getDefaultContext().set(EXCEPTION_HANDLER, t ->{});
-	}
+    /***************************************
+     * Test class setup.
+     */
+    @BeforeClass
+    public static void setup() {
+        // suppress stacktraces from error testing
+        Coroutines.getDefaultContext().set(EXCEPTION_HANDLER, t -> {});
+    }
 
-	//~ Methods ----------------------------------------------------------------
+    //~ Methods ----------------------------------------------------------------
 
-	/***************************************
-	 * Test of asynchronous channel communication.
-	 */
-	@Test
-	public void testChannel()
-	{
-		Coroutine<?, String> receive2 =
-			RECEIVE.then(apply((String s) -> s.toLowerCase()));
+    /***************************************
+     * Test of asynchronous channel communication.
+     */
+    @Test
+    public void testChannel() {
+        Coroutine<?, String> receive2 =
+            RECEIVE.then(apply((String s) -> s.toLowerCase()));
 
-		launch(
-			scope ->
-			{
-				Continuation<String> r1 = RECEIVE.runAsync(scope);
-				Continuation<String> r2 = receive2.runAsync(scope);
+        launch(scope -> {
+            Continuation<String> r1 = RECEIVE.runAsync(scope);
+            Continuation<String> r2 = receive2.runAsync(scope);
 
-				Continuation<?> s1 = SEND.runAsync(scope, "123");
-				Continuation<?> s2 = SEND.runAsync(scope, "456");
+            Continuation<?> s1 = SEND.runAsync(scope, "123");
+            Continuation<?> s2 = SEND.runAsync(scope, "456");
 
-				assertEquals("123test", s1.getResult());
-				assertEquals("456test", s2.getResult());
+            assertEquals("123test", s1.getResult());
+            assertEquals("456test", s2.getResult());
 
-				String r1v = r1.getResult();
-				String r2v = r2.getResult();
+            String r1v = r1.getResult();
+            String r2v = r2.getResult();
 
-				// because of the concurrent execution it is not fixed which
-				// of the values r1 and r2 will receive
-				assertTrue(
-					"123test".equalsIgnoreCase(r1v) ||
-					"456test".equalsIgnoreCase(r1v));
-				assertTrue(
-					"123test".equalsIgnoreCase(r2v) ||
-					"456test".equalsIgnoreCase(r2v));
-				assertTrue(s1.isFinished());
-				assertTrue(s2.isFinished());
-				assertTrue(r1.isFinished());
-				assertTrue(r2.isFinished());
-			});
-	}
+            // because of the concurrent execution it is not fixed which
+            // of the values r1 and r2 will receive
+            assertTrue("123test".equalsIgnoreCase(r1v)
+                || "456test".equalsIgnoreCase(r1v));
+            assertTrue("123test".equalsIgnoreCase(r2v)
+                || "456test".equalsIgnoreCase(r2v));
+            assertTrue(s1.isFinished());
+            assertTrue(s2.isFinished());
+            assertTrue(r1.isFinished());
+            assertTrue(r2.isFinished());
+        });
+    }
 
-	/***************************************
-	 * Test of channel closing.
-	 */
-	@Test
-	public void testChannelClose()
-	{
-		launch(
-			scope ->
-			{
-				Continuation<String> result = null;
+    /***************************************
+     * Test of channel closing.
+     */
+    @Test
+    public void testChannelClose() {
+        launch(scope -> {
+            Continuation<String> result = null;
 
-				try
-				{
-					result = RECEIVE.runAsync(scope);
+            try {
+                result = RECEIVE.runAsync(scope);
 
-					result.getChannel(TEST_CHANNEL).close();
-					result.getResult();
-				}
-				catch (ChannelClosedException e)
-				{
-					// expected
-					result.errorHandled();
-				}
-			});
+                result.getChannel(TEST_CHANNEL).close();
+                result.getResult();
+            } catch (ChannelClosedException e) {
+                // expected
+                result.errorHandled();
+            }
+        });
 
-		launch(
-			scope ->
-			{
-				Continuation<String> result = null;
+        launch(scope -> {
+            Continuation<String> result = null;
 
-				try
-				{
-					scope.getChannel(TEST_CHANNEL).close();
-					result = SEND.runAsync(scope, "TEST");
+            try {
+                scope.getChannel(TEST_CHANNEL).close();
+                result = SEND.runAsync(scope, "TEST");
 
-					result.getResult();
-					fail();
-				}
-				catch (ChannelClosedException e)
-				{
-					// expected
-					result.errorHandled();
-				}
-			});
-	}
+                result.getResult();
+                fail();
+            } catch (ChannelClosedException e) {
+                // expected
+                result.errorHandled();
+            }
+        });
+    }
 }

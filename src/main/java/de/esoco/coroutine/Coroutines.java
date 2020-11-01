@@ -32,7 +32,6 @@ import static org.obrel.core.RelationTypes.newDefaultValueType;
 import static org.obrel.core.RelationTypes.newInitialValueType;
 import static org.obrel.core.RelationTypes.newType;
 
-
 /********************************************************************
  * Contains global {@link Coroutine} management functions and relation types. If
  * not stated otherwise the configuration relation types can be set on any level
@@ -40,120 +39,103 @@ import static org.obrel.core.RelationTypes.newType;
  *
  * @author eso
  */
-public class Coroutines
-{
-	//~ Static fields/initializers ---------------------------------------------
+public class Coroutines {
+    //~ Static fields/initializers ---------------------------------------------
 
-	private static CoroutineContext rDefaultContext = new CoroutineContext();
+    private static CoroutineContext rDefaultContext = new CoroutineContext();
 
-	/**
-	 * Configuration: A handler for coroutine exceptions. The main purpose of
-	 * this is to process exception stacktraces when they occur. All coroutine
-	 * exceptions will also be available from the finished scope.The default
-	 * value prints the stacktrace of a failed coroutine execution to the
-	 * console.
-	 */
-	public static final RelationType<Consumer<Throwable>> EXCEPTION_HANDLER =
-		newDefaultValueType((Consumer<Throwable>) (t -> t.printStackTrace()));
+    /**
+     * Configuration: A handler for coroutine exceptions. The main purpose of
+     * this is to process exception stacktraces when they occur. All coroutine
+     * exceptions will also be available from the finished scope.The default
+     * value prints the stacktrace of a failed coroutine execution to the
+     * console.
+     */
+    public static final RelationType<Consumer<Throwable>> EXCEPTION_HANDLER =
+        newDefaultValueType((Consumer<Throwable>) (t -> t.printStackTrace()));
 
-	/**
-	 * Configuration: coroutine event listeners that will be invoked when
-	 * coroutines are started or finished.
-	 */
-	public static final RelationType<EventDispatcher<CoroutineEvent>> COROUTINE_LISTENERS =
-		newInitialValueType(r -> new EventDispatcher<>());
+    /**
+     * Configuration: coroutine event listeners that will be invoked when
+     * coroutines are started or finished.
+     */
+    public static final RelationType<EventDispatcher<CoroutineEvent>> COROUTINE_LISTENERS =
+        newInitialValueType(r -> new EventDispatcher<>());
 
-	/**
-	 * Configuration: a single listener for coroutine suspensions. This listener
-	 * will be invoked with the suspension and a boolean value after a coroutine
-	 * has been suspended (TRUE) or before it is resumed (FALSE). This relation
-	 * is intended mainly for debugging purposes.
-	 */
-	public static final RelationType<BiConsumer<Suspension<?>, Boolean>> COROUTINE_SUSPENSION_LISTENER =
-		newType();
+    /**
+     * Configuration: a single listener for coroutine suspensions. This listener
+     * will be invoked with the suspension and a boolean value after a coroutine
+     * has been suspended (TRUE) or before it is resumed (FALSE). This relation
+     * is intended mainly for debugging purposes.
+     */
+    public static final RelationType<BiConsumer<Suspension<?>, Boolean>> COROUTINE_SUSPENSION_LISTENER =
+        newType();
 
-	/**
-	 * Configuration: a single listener for coroutine step executions. This
-	 * listener will be invoked with the step and continuation just before a
-	 * step is executed. This relation is intended mainly for debugging
-	 * purposes.
-	 */
-	public static final RelationType<BiConsumer<CoroutineStep<?, ?>,
-												Continuation<?>>> COROUTINE_STEP_LISTENER =
-		newType();
+    /**
+     * Configuration: a single listener for coroutine step executions. This
+     * listener will be invoked with the step and continuation just before a
+     * step is executed. This relation is intended mainly for debugging
+     * purposes.
+     */
+    public static final RelationType<BiConsumer<CoroutineStep<?, ?>, Continuation<?>>> COROUTINE_STEP_LISTENER =
+        newType();
 
-	static
-	{
-		RelationTypes.init(Coroutines.class);
-	}
+    static {
+        RelationTypes.init(Coroutines.class);
+    }
 
-	//~ Constructors -----------------------------------------------------------
+    //~ Constructors -----------------------------------------------------------
 
-	/***************************************
-	 * Private, only static use.
-	 */
-	private Coroutines()
-	{
-	}
+    /***************************************
+     * Private, only static use.
+     */
+    private Coroutines() {}
 
-	//~ Static methods ---------------------------------------------------------
+    //~ Static methods ---------------------------------------------------------
 
-	/***************************************
-	 * Iterates over all relations in the given state object that are annotated
-	 * with {@link MetaTypes#MANAGED} and closes them if they implement the
-	 * {@link AutoCloseable} interface. This is invoked automatically
-	 *
-	 * @param rState        The state relatable to check for managed resources
-	 * @param fErrorHandler A consumer for exceptions that occur when closing a
-	 *                      resource
-	 */
-	public static void closeManagedResources(
-		Relatable			rState,
-		Consumer<Throwable> fErrorHandler)
-	{
-		rState.streamRelations()
-			  .filter(
-	  			r ->
-	  				r.hasAnnotation(MetaTypes.MANAGED) &&
-	  				r.getTarget() != null)
-			  .map(Relation::getTarget)
-			  .forEach(
-	  			t ->
-	  		{
-	  			if (t instanceof AutoCloseable)
-	  			{
-	  				try
-	  				{
-	  					((AutoCloseable) t).close();
-	  				}
-	  				catch (Exception e)
-	  				{
-	  					fErrorHandler.accept(e);
-	  				}
-	  			}
-	  		});
-	}
+    /***************************************
+     * Iterates over all relations in the given state object that are annotated
+     * with {@link MetaTypes#MANAGED} and closes them if they implement the
+     * {@link AutoCloseable} interface. This is invoked automatically
+     *
+     * @param rState        The state relatable to check for managed resources
+     * @param fErrorHandler A consumer for exceptions that occur when closing a
+     *                      resource
+     */
+    public static void closeManagedResources(Relatable rState,
+        Consumer<Throwable> fErrorHandler) {
+        rState.streamRelations()
+            .filter(r -> r.hasAnnotation(MetaTypes.MANAGED)
+                && r.getTarget() != null)
+            .map(Relation::getTarget)
+            .forEach(t -> {
+                if (t instanceof AutoCloseable) {
+                    try {
+                        ((AutoCloseable) t).close();
+                    } catch (Exception e) {
+                        fErrorHandler.accept(e);
+                    }
+                }
+            });
+    }
 
-	/***************************************
-	 * Returns the default {@link CoroutineContext}.
-	 *
-	 * @return The default context
-	 */
-	public static CoroutineContext getDefaultContext()
-	{
-		return rDefaultContext;
-	}
+    /***************************************
+     * Returns the default {@link CoroutineContext}.
+     *
+     * @return The default context
+     */
+    public static CoroutineContext getDefaultContext() {
+        return rDefaultContext;
+    }
 
-	/***************************************
-	 * Sets the default {@link CoroutineContext}. The context will be used for
-	 * all coroutines that are started without an explicit context.
-	 *
-	 * @param rContext The new default context or NULL for none
-	 */
-	public static void setDefaultContext(CoroutineContext rContext)
-	{
-		Objects.requireNonNull(rContext);
+    /***************************************
+     * Sets the default {@link CoroutineContext}. The context will be used for
+     * all coroutines that are started without an explicit context.
+     *
+     * @param rContext The new default context or NULL for none
+     */
+    public static void setDefaultContext(CoroutineContext rContext) {
+        Objects.requireNonNull(rContext);
 
-		rDefaultContext = rContext;
-	}
+        rDefaultContext = rContext;
+    }
 }

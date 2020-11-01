@@ -18,58 +18,55 @@ package de.esoco.coroutine;
 
 import de.esoco.lib.event.GenericEvent;
 
-
 /********************************************************************
  * The event object for coroutine events.
  *
  * @author eso
  */
-public class CoroutineEvent extends GenericEvent<Continuation<?>>
-{
-	//~ Enums ------------------------------------------------------------------
+public class CoroutineEvent extends GenericEvent<Continuation<?>> {
+    //~ Enums ------------------------------------------------------------------
 
-	/********************************************************************
-	 * The available event types.
-	 */
-	public enum EventType { STARTED, FINISHED }
+    /********************************************************************
+     * The available event types.
+     */
+    public enum EventType {
+        STARTED, FINISHED
+    }
 
-	//~ Instance fields --------------------------------------------------------
+    //~ Instance fields --------------------------------------------------------
 
-	private final EventType eType;
+    private final EventType eType;
 
-	//~ Constructors -----------------------------------------------------------
+    //~ Constructors -----------------------------------------------------------
 
-	/***************************************
-	 * Creates a new instance.
-	 *
-	 * @param rContinuation The continuation of the coroutine execution
-	 * @param eType         The event type
-	 */
-	public CoroutineEvent(Continuation<?> rContinuation, EventType eType)
-	{
-		super(rContinuation);
+    /***************************************
+     * Creates a new instance.
+     *
+     * @param rContinuation The continuation of the coroutine execution
+     * @param eType         The event type
+     */
+    public CoroutineEvent(Continuation<?> rContinuation, EventType eType) {
+        super(rContinuation);
 
-		this.eType = eType;
-	}
+        this.eType = eType;
+    }
 
-	//~ Methods ----------------------------------------------------------------
+    //~ Methods ----------------------------------------------------------------
 
-	/***************************************
-	 * Returns the event type.
-	 *
-	 * @return The event type
-	 */
-	public EventType getType()
-	{
-		return eType;
-	}
+    /***************************************
+     * Returns the event type.
+     *
+     * @return The event type
+     */
+    public EventType getType() {
+        return eType;
+    }
 
-	/***************************************
-	 * {@inheritDoc}
-	 */
-	@Override
-	protected String paramString()
-	{
-		return eType.name();
-	}
+    /***************************************
+     * {@inheritDoc}
+     */
+    @Override
+    protected String paramString() {
+        return eType.name();
+    }
 }

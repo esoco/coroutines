@@ -18,206 +18,185 @@ package de.esoco.coroutine;
 
 import de.esoco.lib.concurrent.RunLock;
 
-
 /********************************************************************
  * Encapsulates the data that represents a suspended {@link Coroutine}. The
  * execution can be resumed by invoking {@link #resume()}.
  *
  * @author eso
  */
-public class Suspension<T>
-{
-	//~ Instance fields --------------------------------------------------------
+public class Suspension<T> {
+    //~ Instance fields --------------------------------------------------------
 
-	private T rValue;
+    private T rValue;
 
-	private final CoroutineStep<?, T> rSuspendingStep;
-	private final CoroutineStep<T, ?> rResumeStep;
-	private final Continuation<?>     rContinuation;
+    private final CoroutineStep<?, T> rSuspendingStep;
 
-	private boolean		  bCancelled  = false;
-	private final RunLock aCancelLock = new RunLock();
+    private final CoroutineStep<T, ?> rResumeStep;
 
-	//~ Constructors -----------------------------------------------------------
+    private final Continuation<?> rContinuation;
 
-	/***************************************
-	 * Creates a new instance. The input value for the resume step is not
-	 * provided here because it is typically not available upon suspension
-	 * because it will only become available when the suspension is resumed
-	 * (e.g. when receiving data). To resume execution with an explicit input
-	 * value the method {@link #resume(Object)} can be used. If the resume
-	 * should occur at a different time than the availability of the input value
-	 * a suspension can be updated by calling {@link #withValue(Object)}. In
-	 * that case {@link #resume()} can be used later to resume the execution.
-	 *
-	 * @param rSuspendingStep The step that initiated the suspension
-	 * @param rResumeStep     The step to resume the execution with
-	 * @param rContinuation   The continuation of the execution
-	 */
-	protected Suspension(CoroutineStep<?, T> rSuspendingStep,
-						 CoroutineStep<T, ?> rResumeStep,
-						 Continuation<?>	 rContinuation)
-	{
-		this.rSuspendingStep = rSuspendingStep;
-		this.rResumeStep     = rResumeStep;
-		this.rContinuation   = rContinuation;
-	}
+    private boolean bCancelled = false;
 
-	//~ Methods ----------------------------------------------------------------
+    private final RunLock aCancelLock = new RunLock();
 
-	/***************************************
-	 * Cancels this suspension. This will {@link Continuation#cancel() cancel}
-	 * the continuation. Tries to resume a cancelled suspension will be ignored.
-	 */
-	public void cancel()
-	{
-		aCancelLock.runLocked(() -> bCancelled = true);
+    //~ Constructors -----------------------------------------------------------
 
-		if (!rContinuation.isCancelled())
-		{
-			rContinuation.cancel();
-		}
-	}
+    /***************************************
+     * Creates a new instance. The input value for the resume step is not
+     * provided here because it is typically not available upon suspension
+     * because it will only become available when the suspension is resumed
+     * (e.g. when receiving data). To resume execution with an explicit input
+     * value the method {@link #resume(Object)} can be used. If the resume
+     * should occur at a different time than the availability of the input value
+     * a suspension can be updated by calling {@link #withValue(Object)}. In
+     * that case {@link #resume()} can be used later to resume the execution.
+     *
+     * @param rSuspendingStep The step that initiated the suspension
+     * @param rResumeStep     The step to resume the execution with
+     * @param rContinuation   The continuation of the execution
+     */
+    protected Suspension(CoroutineStep<?, T> rSuspendingStep,
+        CoroutineStep<T, ?> rResumeStep, Continuation<?> rContinuation) {
+        this.rSuspendingStep = rSuspendingStep;
+        this.rResumeStep     = rResumeStep;
+        this.rContinuation   = rContinuation;
+    }
 
-	/***************************************
-	 * Returns the continuation of the suspended coroutine.
-	 *
-	 * @return The continuation
-	 */
-	public final Continuation<?> continuation()
-	{
-		return rContinuation;
-	}
+    //~ Methods ----------------------------------------------------------------
 
-	/***************************************
-	 * Cancels this suspension because of an error. This will {@link
-	 * Continuation#fail(Throwable) fail} the continuation. Tries to resume a
-	 * failed suspension will be ignored.
-	 *
-	 * @param eError The error exception
-	 */
-	public void fail(Throwable eError)
-	{
-		aCancelLock.runLocked(() -> bCancelled = true);
+    /***************************************
+     * Cancels this suspension. This will {@link Continuation#cancel() cancel}
+     * the continuation. Tries to resume a cancelled suspension will be ignored.
+     */
+    public void cancel() {
+        aCancelLock.runLocked(() -> bCancelled = true);
 
-		if (!rContinuation.isCancelled())
-		{
-			rContinuation.fail(eError);
-		}
-	}
+        if (!rContinuation.isCancelled()) {
+            rContinuation.cancel();
+        }
+    }
 
-	/***************************************
-	 * Executes code only if this suspension has not (yet) been cancel. The
-	 * given code will be executed with a lock on the cancelation state to
-	 * prevent race conditions if other threads try to cancel a suspension while
-	 * it is resumed.
-	 *
-	 * @param fCode The code to execute only if this suspension is not cancelled
-	 */
-	public void ifNotCancelled(Runnable fCode)
-	{
-		aCancelLock.runLocked(() ->
-		{
-			if (!bCancelled)
-			{
-				fCode.run();
-			}
-		});
-	}
+    /***************************************
+     * Returns the continuation of the suspended coroutine.
+     *
+     * @return The continuation
+     */
+    public final Continuation<?> continuation() {
+        return rContinuation;
+    }
 
-	/***************************************
-	 * Checks if the this suspension has been cancelled.
-	 *
-	 * @return TRUE if the suspension has been cancelled
-	 */
-	public final boolean isCancelled()
-	{
-		return bCancelled;
-	}
+    /***************************************
+     * Cancels this suspension because of an error. This will
+     * {@link Continuation#fail(Throwable) fail} the continuation. Tries to
+     * resume a failed suspension will be ignored.
+     *
+     * @param eError The error exception
+     */
+    public void fail(Throwable eError) {
+        aCancelLock.runLocked(() -> bCancelled = true);
 
-	/***************************************
-	 * Resumes the execution of the suspended coroutine with the input value
-	 * provided to the constructor.
-	 *
-	 * @see #resume(Object)
-	 */
-	public final void resume()
-	{
-		resume(rValue);
-	}
+        if (!rContinuation.isCancelled()) {
+            rContinuation.fail(eError);
+        }
+    }
 
-	/***************************************
-	 * Resumes the execution of the suspended coroutine with the given value.
-	 *
-	 * @param rValue The input value to the resumed step
-	 */
-	public void resume(T rValue)
-	{
-		if (!bCancelled)
-		{
-			this.rValue = rValue;
-			rContinuation.suspensionResumed(this);
+    /***************************************
+     * Executes code only if this suspension has not (yet) been cancel. The
+     * given code will be executed with a lock on the cancelation state to
+     * prevent race conditions if other threads try to cancel a suspension while
+     * it is resumed.
+     *
+     * @param fCode The code to execute only if this suspension is not cancelled
+     */
+    public void ifNotCancelled(Runnable fCode) {
+        aCancelLock.runLocked(() -> {
+            if (!bCancelled) {
+                fCode.run();
+            }
+        });
+    }
 
-			resumeAsync();
-		}
-	}
+    /***************************************
+     * Checks if the this suspension has been cancelled.
+     *
+     * @return TRUE if the suspension has been cancelled
+     */
+    public final boolean isCancelled() {
+        return bCancelled;
+    }
 
-	/***************************************
-	 * Returns the suspending step.
-	 *
-	 * @return The suspending step
-	 */
-	public final CoroutineStep<?, T> suspendingStep()
-	{
-		return rSuspendingStep;
-	}
+    /***************************************
+     * Resumes the execution of the suspended coroutine with the input value
+     * provided to the constructor.
+     *
+     * @see #resume(Object)
+     */
+    public final void resume() {
+        resume(rValue);
+    }
 
-	/***************************************
-	 * {@inheritDoc}
-	 */
-	@Override
-	public String toString()
-	{
-		return String.format(
-			"%s[%s -> %s]",
-			getClass().getSimpleName(),
-			rSuspendingStep,
-			rResumeStep);
-	}
+    /***************************************
+     * Resumes the execution of the suspended coroutine with the given value.
+     *
+     * @param rValue The input value to the resumed step
+     */
+    public void resume(T rValue) {
+        if (!bCancelled) {
+            this.rValue = rValue;
+            rContinuation.suspensionResumed(this);
 
-	/***************************************
-	 * Returns the value of this suspension. The value will be used as the input
-	 * of the resumed step.
-	 *
-	 * @return The suspension value
-	 */
-	public final T value()
-	{
-		return rValue;
-	}
+            resumeAsync();
+        }
+    }
 
-	/***************************************
-	 * Sets the suspension value and returns this instance so that it can be
-	 * used as an updated argument to method calls.
-	 *
-	 * @param  rValue The new value
-	 *
-	 * @return This instance
-	 */
-	public Suspension<T> withValue(T rValue)
-	{
-		this.rValue = rValue;
+    /***************************************
+     * Returns the suspending step.
+     *
+     * @return The suspending step
+     */
+    public final CoroutineStep<?, T> suspendingStep() {
+        return rSuspendingStep;
+    }
 
-		return this;
-	}
+    /***************************************
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+        return String.format("%s[%s -> %s]", getClass().getSimpleName(),
+            rSuspendingStep, rResumeStep);
+    }
 
-	/***************************************
-	 * Resumes this suspension by asynchronously executing the resume step.
-	 *
-	 * @see Continuation#resumeAsync(CoroutineStep, Object)
-	 */
-	void resumeAsync()
-	{
-		rContinuation.resumeAsync(rResumeStep, rValue);
-	}
+    /***************************************
+     * Returns the value of this suspension. The value will be used as the input
+     * of the resumed step.
+     *
+     * @return The suspension value
+     */
+    public final T value() {
+        return rValue;
+    }
+
+    /***************************************
+     * Sets the suspension value and returns this instance so that it can be
+     * used as an updated argument to method calls.
+     *
+     * @param rValue The new value
+     *
+     * @return This instance
+     */
+    public Suspension<T> withValue(T rValue) {
+        this.rValue = rValue;
+
+        return this;
+    }
+
+    /***************************************
+     * Resumes this suspension by asynchronously executing the resume step.
+     *
+     * @see Continuation#resumeAsync(CoroutineStep, Object)
+     */
+    void resumeAsync() {
+        rContinuation.resumeAsync(rResumeStep, rValue);
+    }
 }
