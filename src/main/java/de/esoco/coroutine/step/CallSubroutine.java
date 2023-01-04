@@ -18,77 +18,62 @@ package de.esoco.coroutine.step;
 
 import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
-import de.esoco.coroutine.Coroutine.Subroutine;
 import de.esoco.coroutine.CoroutineStep;
+import de.esoco.coroutine.Subroutine;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 import static de.esoco.coroutine.step.CodeExecution.apply;
 
-
-/********************************************************************
+/**
  * A {@link Coroutine} step that executes another coroutine in the context of
  * the parent routine.
  *
  * @author eso
  */
-public class CallSubroutine<I, O> extends CoroutineStep<I, O>
-{
-	//~ Instance fields --------------------------------------------------------
+public class CallSubroutine<I, O> extends CoroutineStep<I, O> {
 
-	private final Coroutine<I, O> rCoroutine;
+	private final Coroutine<I, O> coroutine;
 
-	//~ Constructors -----------------------------------------------------------
-
-	/***************************************
+	/**
 	 * Creates a new instance.
 	 *
-	 * @param rCoroutine The sub-coroutine
+	 * @param coroutine The sub-coroutine
 	 */
-	public CallSubroutine(Coroutine<I, O> rCoroutine)
-	{
-		this.rCoroutine = rCoroutine;
+	public CallSubroutine(Coroutine<I, O> coroutine) {
+		this.coroutine = coroutine;
 	}
 
-	//~ Static methods ---------------------------------------------------------
-
-	/***************************************
-	 * Calls a coroutine as a subroutine of the coroutine this step is added to.
+	/**
+	 * Calls a coroutine as a subroutine of the coroutine this step is added
+	 * to.
 	 *
-	 * @param  rCoroutine The coroutine to invoke as a subroutine
-	 *
+	 * @param coroutine The coroutine to invoke as a subroutine
 	 * @return The new coroutine step
 	 */
-	public static <I, O> CallSubroutine<I, O> call(Coroutine<I, O> rCoroutine)
-	{
-		return new CallSubroutine<>(rCoroutine);
+	public static <I, O> CallSubroutine<I, O> call(Coroutine<I, O> coroutine) {
+		return new CallSubroutine<>(coroutine);
 	}
 
-	//~ Methods ----------------------------------------------------------------
-
-	/***************************************
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<I> fPreviousExecution,
-						 CoroutineStep<O, ?>  rReturnStep,
-						 Continuation<?>	  rContinuation)
-	{
+	public void runAsync(CompletableFuture<I> previousExecution,
+		CoroutineStep<O, ?> nextStep, Continuation<?> continuation) {
 		// subroutine needs to be created on invocation because the return step
 		// may change between invocations
-		new Subroutine<>(rCoroutine, rReturnStep).runAsync(
-			fPreviousExecution,
-			rContinuation);
+		new Subroutine<>(coroutine, nextStep).runAsync(previousExecution,
+			continuation);
 	}
 
-	/***************************************
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected O execute(I rInput, Continuation<?> rContinuation)
-	{
-		return new Subroutine<>(rCoroutine, apply(Function.identity()))
-			   .runBlocking(rInput, rContinuation);
+	protected O execute(I input, Continuation<?> continuation) {
+		return new Subroutine<>(coroutine,
+			apply(Function.identity())).runBlocking(input, continuation);
 	}
 }

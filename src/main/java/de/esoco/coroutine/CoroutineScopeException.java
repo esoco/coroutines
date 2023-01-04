@@ -20,59 +20,51 @@ import de.esoco.lib.collection.CollectionUtil;
 
 import java.util.Collection;
 
-/********************************************************************
+/*******************************
  * A runtime exception that is thrown if one or more {@link Coroutine}
  * executions in a {@link CoroutineScope} fail with an exception.
  *
  * @author eso
  */
 public class CoroutineScopeException extends CoroutineException {
-    //~ Static fields/initializers ---------------------------------------------
+	private static final long serialVersionUID = 1L;
 
-    private static final long serialVersionUID = 1L;
+	private final Collection<Continuation<?>> failedContinuations;
 
-    //~ Instance fields --------------------------------------------------------
+	/**
+	 * Creates a new instance from the continuations of failed coroutines. The
+	 * causing exception will be set to the error of the first element in the
+	 * argument collection.
+	 *
+	 * @param failed The failed continuations
+	 */
+	public CoroutineScopeException(Collection<Continuation<?>> failed) {
+		super(CollectionUtil.firstElementOf(failed).getError());
 
-    private final Collection<Continuation<?>> rFailedContinuations;
+		failedContinuations = failed;
+	}
 
-    //~ Constructors -----------------------------------------------------------
+	/**
+	 * Creates a new instance from an explicit causing exception and optional
+	 * continuations of failed coroutines.
+	 *
+	 * @param cause  The causing exception
+	 * @param failed The failed continuations (optional)
+	 */
+	public CoroutineScopeException(Throwable cause,
+		Collection<Continuation<?>> failed) {
+		super(cause);
 
-    /***************************************
-     * Creates a new instance from the continuations of failed coroutines. The
-     * causing exception will be set to the error of the first element in the
-     * argument collection.
-     *
-     * @param rFailed The failed continuations
-     */
-    public CoroutineScopeException(Collection<Continuation<?>> rFailed) {
-        super(CollectionUtil.firstElementOf(rFailed).getError());
+		failedContinuations = failed;
+	}
 
-        rFailedContinuations = rFailed;
-    }
-
-    /***************************************
-     * Creates a new instance from an explicit causing exception and optional
-     * continuations of failed coroutines.
-     *
-     * @param eCause  The causing exception
-     * @param rFailed The failed continuations (optional)
-     */
-    public CoroutineScopeException(Throwable eCause,
-        Collection<Continuation<?>> rFailed) {
-        super(eCause);
-
-        rFailedContinuations = rFailed;
-    }
-
-    //~ Methods ----------------------------------------------------------------
-
-    /***************************************
-     * Returns the failed continuations that caused this exception. The actual
-     * error exceptions can be queried with {@link Continuation#getError()}.
-     *
-     * @return The continuation
-     */
-    public Collection<Continuation<?>> getFailedContinuations() {
-        return rFailedContinuations;
-    }
+	/**
+	 * Returns the failed continuations that caused this exception. The actual
+	 * error exceptions can be queried with {@link Continuation#getError()}.
+	 *
+	 * @return The continuation
+	 */
+	public Collection<Continuation<?>> getFailedContinuations() {
+		return failedContinuations;
+	}
 }

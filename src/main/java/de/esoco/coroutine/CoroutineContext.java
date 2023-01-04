@@ -25,140 +25,135 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
-/********************************************************************
+/**
  * The context for the execution of {@link Coroutine Coroutines}.
  *
  * @author eso
  */
 public class CoroutineContext extends CoroutineEnvironment {
-    //~ Instance fields --------------------------------------------------------
 
-    private final Executor rExecutor;
+	private final Executor executor;
 
-    private ScheduledExecutorService rScheduler;
+	private final AtomicLong runningScopes = new AtomicLong();
 
-    private final AtomicLong nRunningScopes = new AtomicLong();
+	private final RunLock scopeLock = new RunLock();
 
-    private final RunLock aScopeLock = new RunLock();
+	private ScheduledExecutorService scheduler;
 
-    private CountDownLatch aScopesFinishedSignal = new CountDownLatch(1);
+	private CountDownLatch scopesFinishedSignal = new CountDownLatch(1);
 
-    //~ Constructors -----------------------------------------------------------
+	/**
+	 * Creates a new instance that uses the
+	 * {@link ForkJoinPool#commonPool() common thread pool} as the executor.
+	 */
+	public CoroutineContext() {
+		this(ForkJoinPool.commonPool());
+	}
 
-    /***************************************
-     * Creates a new instance that uses the {@link ForkJoinPool#commonPool()
-     * common thread pool} as the executor.
-     */
-    public CoroutineContext() {
-        this(ForkJoinPool.commonPool());
-    }
+	/**
+	 * Creates a new instance with a specific coroutine executor. If the
+	 * executor also implements the {@link ScheduledExecutorService} interface
+	 * it will also be used for scheduling purposes.
+	 *
+	 * @param executor The coroutine executor
+	 */
+	public CoroutineContext(Executor executor) {
+		this.executor = executor;
 
-    /***************************************
-     * Creates a new instance with a specific coroutine executor. If the
-     * executor also implements the {@link ScheduledExecutorService} interface
-     * it will also be used for scheduling purposes.
-     *
-     * @param rExecutor The coroutine executor
-     */
-    public CoroutineContext(Executor rExecutor) {
-        this.rExecutor = rExecutor;
+		if (executor instanceof ScheduledExecutorService) {
+			scheduler = (ScheduledExecutorService) executor;
+		}
+	}
 
-        if (rExecutor instanceof ScheduledExecutorService) {
-            rScheduler = (ScheduledExecutorService) rExecutor;
-        }
-    }
+	/**
+	 * Creates a new instance with a specific coroutine executor and scheduler.
+	 * The latter will be used to execute timed coroutine steps.
+	 *
+	 * @param executor  The coroutine executor
+	 * @param scheduler The scheduled executor service
+	 */
+	public CoroutineContext(Executor executor,
+		ScheduledExecutorService scheduler) {
+		this.executor = executor;
+		this.scheduler = scheduler;
+	}
 
-    /***************************************
-     * Creates a new instance with a specific coroutine executor and scheduler.
-     * The latter will be used to execute timed coroutine steps.
-     *
-     * @param rExecutor  The coroutine executor
-     * @param rScheduler The scheduled executor service
-     */
-    public CoroutineContext(Executor rExecutor,
-        ScheduledExecutorService rScheduler) {
-        this.rExecutor  = rExecutor;
-        this.rScheduler = rScheduler;
-    }
+	/**
+	 * Blocks until the coroutines of all {@link CoroutineScope scopes} in this
+	 * context have finished execution. If no coroutines are running or all have
+	 * finished execution already this method returns immediately.
+	 */
+	public void awaitAllScopes() {
+		if (scopesFinishedSignal != null) {
+			try {
+				scopesFinishedSignal.await();
+			} catch (InterruptedException e) {
+				throw new CoroutineException(e);
+			}
+		}
+	}
 
-    //~ Methods ----------------------------------------------------------------
+	/**
+	 * Returns the executor to be used for the execution of the steps of a
+	 * {@link Coroutine}.
+	 *
+	 * @return The coroutine executor for this context
+	 */
+	public Executor getExecutor() {
+		return executor;
+	}
 
-    /***************************************
-     * Blocks until the coroutines of all {@link CoroutineScope scopes} in this
-     * context have finished execution. If no coroutines are running or all have
-     * finished execution already this method returns immediately.
-     */
-    public void awaitAllScopes() {
-        if (aScopesFinishedSignal != null) {
-            try {
-                aScopesFinishedSignal.await();
-            } catch (InterruptedException e) {
-                throw new CoroutineException(e);
-            }
-        }
-    }
+	/**
+	 * Returns the executor to be used for the execution of timed steps in a
+	 * {@link Coroutine}. If no scheduler has been set in the constructor or
+	 * created before a new instance with a pool size of 1 will be created by
+	 * invoking {@link Executors#newScheduledThreadPool(int)}.
+	 *
+	 * @return The coroutine scheduler for this context
+	 */
+	public ScheduledExecutorService getScheduler() {
+		if (scheduler == null) {
+			scheduler = Executors.newScheduledThreadPool(1);
+		}
+		return scheduler;
+	}
 
-    /***************************************
-     * Returns the executor to be used for the execution of the steps of a
-     * {@link Coroutine}.
-     *
-     * @return The coroutine executor for this context
-     */
-    public Executor getExecutor() {
-        return rExecutor;
-    }
+	/**
+	 * Returns the number of currently active {@link CoroutineScope scopes}.
+	 * This will only be a momentary value as the execution of the coroutines in
+	 * the scopes happens asynchronously and some coroutines may finish while
+	 * querying this count.
+	 *
+	 * @return The number of running coroutines
+	 */
+	public long getScopeCount() {
+		return runningScopes.get();
+	}
 
-    /***************************************
-     * Returns the executor to be used for the execution of timed steps in a
-     * {@link Coroutine}. If no scheduler has been set in the constructor or
-     * created before a new instance with a pool size of 1 will be created by
-     * invoking {@link Executors#newScheduledThreadPool(int)}.
-     *
-     * @return The coroutine scheduler for this context
-     */
-    public ScheduledExecutorService getScheduler() {
-        if (rScheduler == null) {
-            rScheduler = Executors.newScheduledThreadPool(1);
-        }
-        return rScheduler;
-    }
+	/**
+	 * Notifies this context that a {@link CoroutineScope} has finished
+	 * executing all coroutines.
+	 *
+	 * @param scope The finished scope
+	 */
+	void scopeFinished(CoroutineScope scope) {
+		if (runningScopes.decrementAndGet() == 0) {
+			scopeLock.runLocked(() -> scopesFinishedSignal.countDown());
+		}
+	}
 
-    /***************************************
-     * Returns the number of currently active {@link CoroutineScope scopes}.
-     * This will only be a momentary value as the execution of the coroutines in
-     * the scopes happens asynchronously and some coroutines may finish while
-     * querying this count.
-     *
-     * @return The number of running coroutines
-     */
-    public long getScopeCount() {
-        return nRunningScopes.get();
-    }
-
-    /***************************************
-     * Notifies this context that a {@link CoroutineScope} has finished
-     * executing all coroutines.
-     *
-     * @param rScope The finished scope
-     */
-    void scopeFinished(CoroutineScope rScope) {
-        if (nRunningScopes.decrementAndGet() == 0) {
-            aScopeLock.runLocked(() -> aScopesFinishedSignal.countDown());
-        }
-    }
-
-    /***************************************
-     * Notifies this context that a {@link CoroutineScope} has been launched.
-     *
-     * @param rScope The launched scope
-     */
-    void scopeLaunched(CoroutineScope rScope) {
-        if (nRunningScopes.incrementAndGet() == 1) {
-            aScopeLock.runLocked(() -> {
-                if (aScopesFinishedSignal.getCount() == 0) {
-                    aScopesFinishedSignal = new CountDownLatch(1);
-                }
-            });
-        }
-    }
+	/**
+	 * Notifies this context that a {@link CoroutineScope} has been launched.
+	 *
+	 * @param scope The launched scope
+	 */
+	void scopeLaunched(CoroutineScope scope) {
+		if (runningScopes.incrementAndGet() == 1) {
+			scopeLock.runLocked(() -> {
+				if (scopesFinishedSignal.getCount() == 0) {
+					scopesFinishedSignal = new CountDownLatch(1);
+				}
+			});
+		}
+	}
 }

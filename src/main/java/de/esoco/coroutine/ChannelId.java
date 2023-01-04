@@ -18,13 +18,13 @@ package de.esoco.coroutine;
 
 import java.util.Objects;
 
-/********************************************************************
+/**
  * This is a marker interface for identifiers of {@link Channel channels} which
  * are used for communication between {@link Coroutine coroutines}. One possible
  * usage would be to implement it on enums or similar constants that are to be
  * used as channel IDs. To simplify typed lookup of channels IDs are generically
  * typed with the datatype of the target channel. Either implementations or
- * application are responsible that their channel IDs are unique also with
+ * applications are responsible that their channel IDs are unique also with
  * respect to the datatype.
  *
  * <p>
@@ -38,138 +38,123 @@ import java.util.Objects;
  * @author eso
  */
 public interface ChannelId<T> {
-    //~ Static methods ---------------------------------------------------------
 
-    /***************************************
-     * Creates a channel ID with a boolean datatype.
-     *
-     * @param sId The ID string
-     *
-     * @return The new boolean ID
-     *
-     * @see #channel(String, Class)
-     */
-    public static ChannelId<Boolean> booleanChannel(String sId) {
-        return channel(sId, Boolean.class);
-    }
+	/**
+	 * Creates a channel ID with a boolean datatype.
+	 *
+	 * @param id The ID string
+	 * @return The new boolean ID
+	 * @see #channel(String, Class)
+	 */
+	static ChannelId<Boolean> booleanChannel(String id) {
+		return channel(id, Boolean.class);
+	}
 
-    /***************************************
-     * Creates a new channel ID from an identifier string. Channel IDs with the
-     * same identifier string are considered equal and will therefore give
-     * access to the same channel in a {@link CoroutineContext}. IDs aren't
-     * cached so that invocations with the the same string and datatyoe will
-     * return different instances which are considered equal (see below). To
-     * avoid name clashes in complex scenarios the ID names should be selected
-     * appropriately, e.g. by using namespaces. The implementation doesn't
-     * impose any restrictions on the strings used to define IDs.
-     *
-     * <p>
-     * Equality of string-based IDs is also based on the datatype. That means
-     * that it is possible to create equal-named channel IDs for different
-     * datatypes. Accessing channels through such IDs would yield different
-     * channel instances but that usage is not recommended. It lies in the
-     * responsibility of the application to name channel IDs appropriately for
-     * the respective context (or provide it's own {@link ChannelId}
-     * implementations).
-     * </p>
-     *
-     * @param sId       The channel ID string
-     * @param rDatatype The class of the channel datatype to ensure
-     *
-     * @return A new channel ID
-     */
-    public static <T> ChannelId<T> channel(String sId, Class<T> rDatatype) {
-        Objects.requireNonNull(sId);
-        Objects.requireNonNull(rDatatype);
+	/**
+	 * Creates a new channel ID from an identifier string. Channel IDs with the
+	 * same identifier string are considered equal and will therefore give
+	 * access to the same channel in a {@link CoroutineContext}. IDs aren't
+	 * cached so that invocations with the the same string and datatyoe will
+	 * return different instances which are considered equal (see below). To
+	 * avoid name clashes in complex scenarios the ID names should be selected
+	 * appropriately, e.g. by using namespaces. The implementation doesn't
+	 * impose any restrictions on the strings used to define IDs.
+	 *
+	 * <p>
+	 * Equality of string-based IDs is also based on the datatype. That means
+	 * that it is possible to create equal-named channel IDs for different
+	 * datatypes. Accessing channels through such IDs would yield different
+	 * channel instances but that usage is not recommended. It lies in the
+	 * responsibility of the application to name channel IDs appropriately for
+	 * the respective context (or provide it's own {@link ChannelId}
+	 * implementations).
+	 * </p>
+	 *
+	 * @param id       The channel ID string
+	 * @param datatype The class of the channel datatype to ensure
+	 * @return A new channel ID
+	 */
+	static <T> ChannelId<T> channel(String id, Class<T> datatype) {
+		Objects.requireNonNull(id);
+		Objects.requireNonNull(datatype);
 
-        return new StringId<>(sId, rDatatype);
-    }
+		return new StringId<>(id, datatype);
+	}
 
-    /***************************************
-     * Creates a channel ID with an integer datatype.
-     *
-     * @param sId The ID string
-     *
-     * @return The new integer ID
-     *
-     * @see #channel(String, Class)
-     */
-    public static ChannelId<Integer> intChannel(String sId) {
-        return channel(sId, Integer.class);
-    }
+	/**
+	 * Creates a channel ID with an integer datatype.
+	 *
+	 * @param id The ID string
+	 * @return The new integer ID
+	 * @see #channel(String, Class)
+	 */
+	static ChannelId<Integer> intChannel(String id) {
+		return channel(id, Integer.class);
+	}
 
-    /***************************************
-     * Creates a channel ID with a string datatype.
-     *
-     * @param sId The ID string
-     *
-     * @return The new string ID
-     *
-     * @see #channel(String, Class)
-     */
-    public static ChannelId<String> stringChannel(String sId) {
-        return channel(sId, String.class);
-    }
+	/**
+	 * Creates a channel ID with a string datatype.
+	 *
+	 * @param id The ID string
+	 * @return The new string ID
+	 * @see #channel(String, Class)
+	 */
+	static ChannelId<String> stringChannel(String id) {
+		return channel(id, String.class);
+	}
 
-    //~ Inner Classes ----------------------------------------------------------
+	/**
+	 * Internal implementation of string-based channel IDs.
+	 *
+	 * @author eso
+	 */
+	class StringId<T> implements ChannelId<T> {
 
-    /********************************************************************
-     * Internal implementation of string-based channel IDs.
-     *
-     * @author eso
-     */
-    static class StringId<T> implements ChannelId<T> {
-        //~ Instance fields ----------------------------------------------------
+		private final String id;
 
-        private final String sId;
+		private final Class<T> datatype;
 
-        private final Class<T> rDatatype;
+		/**
+		 * Creates a new instance.
+		 *
+		 * @param id       The ID string
+		 * @param datatype The channel datatype
+		 */
+		StringId(String id, Class<T> datatype) {
+			this.id = id;
+			this.datatype = datatype;
+		}
 
-        //~ Constructors -------------------------------------------------------
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) {
+				return true;
+			}
+			if (obj == null || getClass() != obj.getClass()) {
+				return false;
+			}
+			StringId<?> other = (StringId<?>) obj;
 
-        /***************************************
-         * Creates a new instance.
-         *
-         * @param sId       The ID string
-         * @param rDatatype The channel datatype
-         */
-        StringId(String sId, Class<T> rDatatype) {
-            this.sId       = sId;
-            this.rDatatype = rDatatype;
-        }
+			return datatype == other.datatype && id.equals(other.id);
+		}
 
-        //~ Methods ------------------------------------------------------------
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public int hashCode() {
+			return 17 * datatype.hashCode() + id.hashCode();
+		}
 
-        /***************************************
-         * {@inheritDoc}
-         */
-        @Override
-        public boolean equals(Object rObject) {
-            if (this == rObject) {
-                return true;
-            }
-            if (rObject == null || getClass() != rObject.getClass()) {
-                return false;
-            }
-            StringId<?> rOther = (StringId<?>) rObject;
-
-            return rDatatype == rOther.rDatatype && sId.equals(rOther.sId);
-        }
-
-        /***************************************
-         * {@inheritDoc}
-         */
-        @Override
-        public int hashCode() {
-            return 17 * rDatatype.hashCode() + sId.hashCode();
-        }
-
-        /***************************************
-         * {@inheritDoc}
-         */
-        @Override
-        public String toString() {
-            return String.format("%s<%s>", sId, rDatatype.getSimpleName());
-        }
-    }
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public String toString() {
+			return String.format("%s<%s>", id, datatype.getSimpleName());
+		}
+	}
 }

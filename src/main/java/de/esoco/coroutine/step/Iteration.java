@@ -28,7 +28,6 @@ import java.util.function.Supplier;
 
 import static de.esoco.coroutine.step.CodeExecution.consume;
 
-
 /********************************************************************
  * A step that implements suspendable iteration over an {@link Iterable} input
  * value. Each value returned by the iterator will be processed with a separate
@@ -42,12 +41,12 @@ import static de.esoco.coroutine.step.CodeExecution.consume;
  * @author eso
  */
 public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
-	extends CoroutineStep<I, C>
-{
+	extends CoroutineStep<I, C> {
 	//~ Instance fields --------------------------------------------------------
 
 	private final CoroutineStep<T, R> rProcessingStep;
-	private final Supplier<C>		  fCollectionFactory;
+
+	private final Supplier<C> fCollectionFactory;
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -60,11 +59,9 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	 * @param rProcessingStep    The step to be applied to each value returned
 	 *                           by the iterator
 	 */
-	public Iteration(
-		Supplier<C>			fCollectionFactory,
-		CoroutineStep<T, R> rProcessingStep)
-	{
-		this.rProcessingStep    = rProcessingStep;
+	public Iteration(Supplier<C> fCollectionFactory,
+		CoroutineStep<T, R> rProcessingStep) {
+		this.rProcessingStep = rProcessingStep;
 		this.fCollectionFactory = fCollectionFactory;
 	}
 
@@ -75,9 +72,8 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	 *
 	 * @see #collectEachInto(Supplier, CoroutineStep)
 	 */
-	public static <T, R, I extends Iterable<T>> CoroutineStep<I, List<R>>
-	collectEach(CoroutineStep<T, R> rProcessingStep)
-	{
+	public static <T, R, I extends Iterable<T>> CoroutineStep<I, List<R>> collectEach(
+		CoroutineStep<T, R> rProcessingStep) {
 		return collectEachInto(() -> new ArrayList<>(), rProcessingStep);
 	}
 
@@ -95,11 +91,8 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	 *
 	 * @return A new step instance
 	 */
-	public static <T, R, I extends Iterable<T>, C extends Collection<R>> CoroutineStep<I, C>
-	collectEachInto(
-		Supplier<C>			fCollectionFactory,
-		CoroutineStep<T, R> rProcessingStep)
-	{
+	public static <T, R, I extends Iterable<T>, C extends Collection<R>> CoroutineStep<I, C> collectEachInto(
+		Supplier<C> fCollectionFactory, CoroutineStep<T, R> rProcessingStep) {
 		return new Iteration<>(fCollectionFactory, rProcessingStep);
 	}
 
@@ -116,8 +109,7 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static <T, I extends Iterable<T>> CoroutineStep<I, Void> forEach(
-		CoroutineStep<T, ?> rProcessingStep)
-	{
+		CoroutineStep<T, ?> rProcessingStep) {
 		// needs to be raw as the actual return type of the processing step is
 		// not known; but as the processing results are discarded the type of
 		// the iteration step will be <I, ?> where the ? is forced to Void
@@ -130,33 +122,27 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<I> fPreviousExecution,
-						 CoroutineStep<C, ?>  rNextStep,
-						 Continuation<?>	  rContinuation)
-	{
+	public void runAsync(CompletableFuture<I> previousExecution,
+		CoroutineStep<C, ?> nextStep, Continuation<?> continuation) {
 		C aResults =
 			fCollectionFactory != null ? fCollectionFactory.get() : null;
 
-		rContinuation.continueAccept(
-			fPreviousExecution,
-			i -> iterateAsync(i.iterator(), aResults, rNextStep, rContinuation));
+		continuation.continueAccept(previousExecution,
+			i -> iterateAsync(i.iterator(), aResults, nextStep, continuation));
 	}
 
 	/***************************************
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected C execute(I rInput, Continuation<?> rContinuation)
-	{
+	protected C execute(I input, Continuation<?> continuation) {
 		C aResults =
 			fCollectionFactory != null ? fCollectionFactory.get() : null;
 
-		for (T rValue : rInput)
-		{
-			R aResult = rProcessingStep.runBlocking(rValue, rContinuation);
+		for (T rValue : input) {
+			R aResult = rProcessingStep.runBlocking(rValue, continuation);
 
-			if (aResults != null)
-			{
+			if (aResults != null) {
 				aResults.add(aResult);
 			}
 		}
@@ -173,38 +159,21 @@ public class Iteration<T, R, I extends Iterable<T>, C extends Collection<R>>
 	 * @param rNextStep     The step to execute when the iteration is finished
 	 * @param rContinuation The current continuation
 	 */
-	private void iterateAsync(Iterator<T>		  rIterator,
-							  C					  rResults,
-							  CoroutineStep<C, ?> rNextStep,
-							  Continuation<?>	  rContinuation)
-	{
-		if (rIterator.hasNext())
-		{
+	private void iterateAsync(Iterator<T> rIterator, C rResults,
+		CoroutineStep<C, ?> rNextStep, Continuation<?> rContinuation) {
+		if (rIterator.hasNext()) {
 			CompletableFuture<T> fNextIteration =
-				CompletableFuture.supplyAsync(
-					() -> rIterator.next(),
+				CompletableFuture.supplyAsync(() -> rIterator.next(),
 					rContinuation);
 
-			rProcessingStep.runAsync(
-				fNextIteration,
-				consume(
-					o ->
-					{
-						if (rResults != null)
-						{
-							rResults.add(o);
-						}
+			rProcessingStep.runAsync(fNextIteration, consume(o -> {
+				if (rResults != null) {
+					rResults.add(o);
+				}
 
-						iterateAsync(
-							rIterator,
-							rResults,
-							rNextStep,
-							rContinuation);
-					}),
-				rContinuation);
-		}
-		else
-		{
+				iterateAsync(rIterator, rResults, rNextStep, rContinuation);
+			}), rContinuation);
+		} else {
 			rContinuation.suspend(this, rNextStep).resume(rResults);
 		}
 	}

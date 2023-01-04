@@ -17,15 +17,14 @@
 package de.esoco.coroutine;
 
 import de.esoco.coroutine.step.CodeExecution;
-
-import java.util.concurrent.CompletableFuture;
-
 import org.obrel.core.FluentRelatable;
 import org.obrel.core.RelatedObject;
 
+import java.util.concurrent.CompletableFuture;
+
 import static org.obrel.type.StandardTypes.NAME;
 
-/********************************************************************
+/**
  * This is the base class for all steps of coroutines. For simple steps it is
  * sufficient to implement the single abstract method
  * {@link #execute(Object, Continuation)} which must perform the actual
@@ -62,87 +61,82 @@ import static org.obrel.type.StandardTypes.NAME;
  * @author eso
  */
 public abstract class CoroutineStep<I, O> extends RelatedObject
-    implements FluentRelatable<CoroutineStep<I, O>> {
-    //~ Constructors -----------------------------------------------------------
+	implements FluentRelatable<CoroutineStep<I, O>> {
 
-    /***************************************
-     * Creates a new instance.
-     */
-    protected CoroutineStep() {
-        set(NAME, getClass().getSimpleName());
-    }
+	/**
+	 * Creates a new instance.
+	 */
+	protected CoroutineStep() {
+		set(NAME, getClass().getSimpleName());
+	}
 
-    //~ Methods ----------------------------------------------------------------
+	/**
+	 * Runs this execution step asynchronously as a continuation of a previous
+	 * code execution in a {@link CompletableFuture} and proceeds to the next
+	 * step afterwards.
+	 *
+	 * <p>
+	 * Subclasses that need to suspend the invocation of the next step until
+	 * some condition is met (e.g. sending or receiving data has finished) need
+	 * to override this method and create a {@link Suspension} by invoking
+	 * {@link Continuation#suspend(CoroutineStep, CoroutineStep)} on the next
+	 * step. If the condition that caused the suspension resolves the coroutine
+	 * execution can be resumed by calling {@link Suspension#resume(Object)}.
+	 * </p>
+	 *
+	 * <p>
+	 * Subclasses that override this method also need to handle errors by
+	 * terminating any further execution (i.e. not resuming a suspension if such
+	 * exists) and forwarding the causing exception to
+	 * {@link Continuation#fail(Throwable)}.
+	 * </p>
+	 *
+	 * @param previousExecution The future of the previous code execution
+	 * @param nextStep          The next step to execute or NULL for none
+	 * @param continuation      The continuation of the execution
+	 */
+	public void runAsync(CompletableFuture<I> previousExecution,
+		CoroutineStep<O, ?> nextStep, Continuation<?> continuation) {
+		continuation.continueApply(previousExecution,
+			i -> execute(i, continuation), nextStep);
+	}
 
-    /***************************************
-     * Runs this execution step asynchronously as a continuation of a previous
-     * code execution in a {@link CompletableFuture} and proceeds to the next
-     * step afterwards.
-     *
-     * <p>
-     * Subclasses that need to suspend the invocation of the next step until
-     * some condition is met (e.g. sending or receiving data has finished) need
-     * to override this method and create a {@link Suspension} by invoking
-     * {@link Continuation#suspend(CoroutineStep, CoroutineStep)} on the next
-     * step. If the condition that caused the suspension resolves the coroutine
-     * execution can be resumed by calling {@link Suspension#resume(Object)}.
-     * </p>
-     *
-     * <p>
-     * Subclasses that override this method also need to handle errors by
-     * terminating any further execution (i.e. not resuming a suspension if such
-     * exists) and forwarding the causing exception to
-     * {@link Continuation#fail(Throwable)}.
-     * </p>
-     *
-     * @param fPreviousExecution The future of the previous code execution
-     * @param rNextStep          The next step to execute or NULL for none
-     * @param rContinuation      The continuation of the execution
-     */
-    public void runAsync(CompletableFuture<I> fPreviousExecution,
-        CoroutineStep<O, ?> rNextStep, Continuation<?> rContinuation) {
-        rContinuation.continueApply(fPreviousExecution,
-            i -> execute(i, rContinuation), rNextStep);
-    }
+	/**
+	 * Runs this execution immediately, blocking the current thread until the
+	 * execution finishes.
+	 *
+	 * @param input        The input value
+	 * @param continuation The continuation of the execution
+	 * @return The execution result
+	 */
+	public O runBlocking(I input, Continuation<?> continuation) {
+		return execute(input, continuation);
+	}
 
-    /***************************************
-     * Runs this execution immediately, blocking the current thread until the
-     * execution finishes.
-     *
-     * @param rInput        The input value
-     * @param rContinuation The continuation of the execution
-     *
-     * @return The execution result
-     */
-    public O runBlocking(I rInput, Continuation<?> rContinuation) {
-        return execute(rInput, rContinuation);
-    }
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public String toString() {
+		return get(NAME);
+	}
 
-    /***************************************
-     * {@inheritDoc}
-     */
-    @Override
-    public String toString() {
-        return get(NAME);
-    }
+	/**
+	 * This method must be implemented by subclasses to provide the actual
+	 * functionality of this step.
+	 *
+	 * @param input        The input value
+	 * @param continuation The continuation of the execution
+	 * @return The result of the execution
+	 */
+	protected abstract O execute(I input, Continuation<?> continuation);
 
-    /***************************************
-     * This method must be implemented by subclasses to provide the actual
-     * functionality of this step.
-     *
-     * @param rInput        The input value
-     * @param rContinuation The continuation of the execution
-     *
-     * @return The result of the execution
-     */
-    protected abstract O execute(I rInput, Continuation<?> rContinuation);
-
-    /***************************************
-     * Allow subclasses to terminate the coroutine they currently run in.
-     *
-     * @param rContinuation The continuation of the current execution
-     */
-    protected void terminateCoroutine(Continuation<?> rContinuation) {
-        rContinuation.getCurrentCoroutine().terminate(rContinuation);
-    }
+	/**
+	 * Allow subclasses to terminate the coroutine they currently run in.
+	 *
+	 * @param continuation The continuation of the current execution
+	 */
+	protected void terminateCoroutine(Continuation<?> continuation) {
+		continuation.getCurrentCoroutine().terminate(continuation);
+	}
 }

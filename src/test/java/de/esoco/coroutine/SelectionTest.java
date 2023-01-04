@@ -18,134 +18,128 @@ package de.esoco.coroutine;
 
 import de.esoco.coroutine.step.Collect;
 import de.esoco.coroutine.step.Select;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 import static de.esoco.coroutine.ChannelId.stringChannel;
 import static de.esoco.coroutine.CoroutineScope.launch;
 import static de.esoco.coroutine.step.ChannelReceive.receive;
 import static de.esoco.coroutine.step.Collect.collect;
 import static de.esoco.coroutine.step.Select.select;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-/********************************************************************
+/**
  * Test of {@link Selection} steps {@link Select} and {@link Collect}.
  *
  * @author eso
  */
 public class SelectionTest {
-    //~ Static fields/initializers ---------------------------------------------
 
-    private static final ChannelId<String> CHANNEL_A = stringChannel("A");
+	private static final ChannelId<String> CHANNEL_A = stringChannel("A");
 
-    private static final ChannelId<String> CHANNEL_B = stringChannel("B");
+	private static final ChannelId<String> CHANNEL_B = stringChannel("B");
 
-    private static final ChannelId<String> CHANNEL_C = stringChannel("C");
+	private static final ChannelId<String> CHANNEL_C = stringChannel("C");
 
-    private static final List<ChannelId<String>> ALL_CHANNELS =
-        Arrays.asList(CHANNEL_A, CHANNEL_B, CHANNEL_C);
+	private static final List<ChannelId<String>> ALL_CHANNELS =
+		Arrays.asList(CHANNEL_A, CHANNEL_B, CHANNEL_C);
 
-    private static final Coroutine<Void, String> SELECT_ABC =
-        Coroutine.first(select(receive(CHANNEL_A)).or(receive(CHANNEL_B))
-            .or(receive(CHANNEL_C)));
+	private static final Coroutine<Void, String> SELECT_ABC = Coroutine.first(
+		select(receive(CHANNEL_A)).or(receive(CHANNEL_B))
+			.or(receive(CHANNEL_C)));
 
-    private static final Coroutine<Void, Collection<String>> COLLECT_ABC =
-        Coroutine.first(collect(receive(CHANNEL_A)).and(receive(CHANNEL_B))
-            .and(receive(CHANNEL_C)));
+	private static final Coroutine<Void, Collection<String>> COLLECT_ABC =
+		Coroutine.first(collect(receive(CHANNEL_A)).and(receive(CHANNEL_B))
+			.and(receive(CHANNEL_C)));
 
-    //~ Static methods ---------------------------------------------------------
+	/**
+	 * Test class setup.
+	 */
+	@BeforeAll
+	public static void setup() {
+		// suppress stack traces from error testing
+		//		Coroutines.getDefaultContext().set(EXCEPTION_HANDLER, t ->{});
+	}
 
-    /***************************************
-     * Test class setup.
-     */
-    @BeforeClass
-    public static void setup() {
-        // suppress stacktraces from error testing
-        //		Coroutines.getDefaultContext().set(EXCEPTION_HANDLER, t ->{});
-    }
+	/**
+	 * Test of channel select.
+	 */
+	@Test
+	public void testChannelCollect() {
+		testCollect(true);
+		testCollect(false);
+	}
 
-    //~ Methods ----------------------------------------------------------------
+	/**
+	 * Test of channel select.
+	 */
+	@Test
+	public void testChannelSelect() {
+		// execute multiple times to test for "cross-talk" between calls
+		testSelect(CHANNEL_A, true);
+		testSelect(CHANNEL_B, true);
+		testSelect(CHANNEL_C, true);
+		testSelect(CHANNEL_A, false);
+		testSelect(CHANNEL_B, false);
+		testSelect(CHANNEL_C, false);
+	}
 
-    /***************************************
-     * Test of channel select.
-     */
-    @Test
-    public void testChannelCollect() {
-        testCollect(true);
-        testCollect(false);
-    }
+	/**
+	 * Test of collecting from channels.
+	 *
+	 * @param bAsync Async or blocking
+	 */
+	private void testCollect(boolean bAsync) {
+		launch(scope -> {
+			if (!bAsync) {
+				// send first if blocking or else scope will remain blocked
+				ALL_CHANNELS.forEach(
+					id -> scope.getChannel(id).sendBlocking(id.toString()));
+			}
+			Continuation<Collection<String>> c = bAsync ?
+				COLLECT_ABC.runAsync(scope, null) :
+				COLLECT_ABC.runBlocking(scope, null);
 
-    /***************************************
-     * Test of channel select.
-     */
-    @Test
-    public void testChannelSelect() {
-        // execute multiple times to test for "cross-talk" between calls
-        testSelect(CHANNEL_A, true);
-        testSelect(CHANNEL_B, true);
-        testSelect(CHANNEL_C, true);
-        testSelect(CHANNEL_A, false);
-        testSelect(CHANNEL_B, false);
-        testSelect(CHANNEL_C, false);
-    }
+			if (bAsync) {
+				ALL_CHANNELS.forEach(
+					id -> scope.getChannel(id).sendBlocking(id.toString()));
+			}
+			Collection<String> rResult = c.getResult();
 
-    /***************************************
-     * Test of collecting from channels.
-     *
-     * @param bAsync Async or blocking
-     */
-    private void testCollect(boolean bAsync) {
-        launch(scope -> {
-            if (!bAsync) {
-                // send first if blocking or else scope will remain blocked
-                ALL_CHANNELS.forEach(
-                    id -> scope.getChannel(id).sendBlocking(id.toString()));
-            }
-            Continuation<Collection<String>> c =
-                bAsync ? COLLECT_ABC.runAsync(scope)
-                    : COLLECT_ABC.runBlocking(scope);
+			ALL_CHANNELS.forEach(
+				id -> assertTrue(rResult.contains(id.toString())));
+			assertTrue(c.isFinished());
+		});
+	}
 
-            if (bAsync) {
-                ALL_CHANNELS.forEach(
-                    id -> scope.getChannel(id).sendBlocking(id.toString()));
-            }
-            Collection<String> rResult = c.getResult();
+	/**
+	 * Test of selecting from a certain channel.
+	 *
+	 * @param rId    The channel ID
+	 * @param bAsync Async or blocking
+	 */
+	private void testSelect(ChannelId<String> rId, boolean bAsync) {
+		launch(scope -> {
+			Channel<String> channel = scope.getChannel(rId);
 
-            ALL_CHANNELS
-                .forEach(id -> assertTrue(rResult.contains(id.toString())));
-            assertTrue(c.isFinished());
-        });
-    }
+			if (!bAsync) {
+				// send first if blocking or else scope will remain blocked
+				channel.sendBlocking(rId.toString());
+			}
+			Continuation<String> c = bAsync ?
+				SELECT_ABC.runAsync(scope, null) :
+				SELECT_ABC.runBlocking(scope, null);
 
-    /***************************************
-     * Test of selecting from a certain channel.
-     *
-     * @param rId    The channel ID
-     * @param bAsync Async or blocking
-     */
-    private void testSelect(ChannelId<String> rId, boolean bAsync) {
-        launch(scope -> {
-            Channel<String> channel = scope.getChannel(rId);
-
-            if (!bAsync) {
-                // send first if blocking or else scope will remain blocked
-                channel.sendBlocking(rId.toString());
-            }
-            Continuation<String> c = bAsync ? SELECT_ABC.runAsync(scope)
-                : SELECT_ABC.runBlocking(scope);
-
-            if (bAsync) {
-                channel.sendBlocking(rId.toString());
-            }
-            assertEquals(rId.toString(), c.getResult());
-            assertTrue(c.isFinished());
-        });
-    }
+			if (bAsync) {
+				channel.sendBlocking(rId.toString());
+			}
+			assertEquals(rId.toString(), c.getResult());
+			assertTrue(c.isFinished());
+		});
+	}
 }

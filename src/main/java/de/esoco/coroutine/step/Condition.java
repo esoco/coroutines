@@ -25,7 +25,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
-
 /********************************************************************
  * A {@link Coroutine} step that test a logical expression in the form of a
  * {@link Predicate} or {@link BiPredicate} and executes certain steps (which
@@ -33,13 +32,14 @@ import java.util.function.Predicate;
  *
  * @author eso
  */
-public class Condition<I, O> extends CoroutineStep<I, O>
-{
+public class Condition<I, O> extends CoroutineStep<I, O> {
 	//~ Instance fields --------------------------------------------------------
 
 	private final BiPredicate<? super I, Continuation<?>> pCondition;
-	private final CoroutineStep<I, O>					  rRunIfTrue;
-	private final CoroutineStep<I, O>					  rRunIfFalse;
+
+	private final CoroutineStep<I, O> rRunIfTrue;
+
+	private final CoroutineStep<I, O> rRunIfFalse;
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -51,14 +51,12 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	 * @param rRunIfFalse The step to run if the condition is FALSE
 	 */
 	public Condition(BiPredicate<? super I, Continuation<?>> pCondition,
-					 CoroutineStep<I, O>					 rRunIfTrue,
-					 CoroutineStep<I, O>					 rRunIfFalse)
-	{
+		CoroutineStep<I, O> rRunIfTrue, CoroutineStep<I, O> rRunIfFalse) {
 		Objects.requireNonNull(pCondition);
 		Objects.requireNonNull(rRunIfTrue);
 
-		this.pCondition  = pCondition;
-		this.rRunIfTrue  = rRunIfTrue;
+		this.pCondition = pCondition;
+		this.rRunIfTrue = rRunIfTrue;
 		this.rRunIfFalse = rRunIfFalse;
 	}
 
@@ -81,10 +79,8 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	 *
 	 * @return The new conditional step
 	 */
-	public static <I, O> Condition<I, O> doIf(
-		Predicate<? super I> fCondition,
-		CoroutineStep<I, O>  rRunIfTrue)
-	{
+	public static <I, O> Condition<I, O> doIf(Predicate<? super I> fCondition,
+		CoroutineStep<I, O> rRunIfTrue) {
 		return new Condition<>((i, c) -> fCondition.test(i), rRunIfTrue, null);
 	}
 
@@ -107,8 +103,7 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	 */
 	public static <I, O> Condition<I, O> doIf(
 		BiPredicate<? super I, Continuation<?>> fCondition,
-		CoroutineStep<I, O>						rRunIfTrue)
-	{
+		CoroutineStep<I, O> rRunIfTrue) {
 		return new Condition<>(fCondition, rRunIfTrue, null);
 	}
 
@@ -131,9 +126,7 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	 */
 	public static <I, O> Condition<I, O> doIfElse(
 		BiPredicate<? super I, Continuation<?>> fCondition,
-		CoroutineStep<I, O>						rRunIfTrue,
-		CoroutineStep<I, O>						rRunIfFalse)
-	{
+		CoroutineStep<I, O> rRunIfTrue, CoroutineStep<I, O> rRunIfFalse) {
 		return new Condition<>(fCondition, rRunIfTrue, rRunIfFalse);
 	}
 
@@ -154,13 +147,9 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	 * @return The new conditional step
 	 */
 	public static <I, O> Condition<I, O> doIfElse(
-		Predicate<? super I> fCondition,
-		CoroutineStep<I, O>  rRunIfTrue,
-		CoroutineStep<I, O>  rRunIfFalse)
-	{
-		return new Condition<>(
-			(i, c) -> fCondition.test(i),
-			rRunIfTrue,
+		Predicate<? super I> fCondition, CoroutineStep<I, O> rRunIfTrue,
+		CoroutineStep<I, O> rRunIfFalse) {
+		return new Condition<>((i, c) -> fCondition.test(i), rRunIfTrue,
 			rRunIfFalse);
 	}
 
@@ -176,8 +165,7 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	 *
 	 * @return A new conditional step
 	 */
-	public Condition<I, O> orElse(CoroutineStep<I, O> rRunIfFalse)
-	{
+	public Condition<I, O> orElse(CoroutineStep<I, O> rRunIfFalse) {
 		return new Condition<>(pCondition, rRunIfTrue, rRunIfFalse);
 	}
 
@@ -185,45 +173,32 @@ public class Condition<I, O> extends CoroutineStep<I, O>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<I> fPreviousExecution,
-						 CoroutineStep<O, ?>  rNextStep,
-						 Continuation<?>	  rContinuation)
-	{
-		rContinuation.continueAccept(
-			fPreviousExecution,
-			i ->
-			{
-				CoroutineStep<I, O> rStep =
-					pCondition.test(i, rContinuation) ? rRunIfTrue
-													  : rRunIfFalse;
+	public void runAsync(CompletableFuture<I> previousExecution,
+		CoroutineStep<O, ?> nextStep, Continuation<?> continuation) {
+		continuation.continueAccept(previousExecution, i -> {
+			CoroutineStep<I, O> rStep =
+				pCondition.test(i, continuation) ? rRunIfTrue : rRunIfFalse;
 
-				if (rStep != null)
-				{
-					// forward to rStep which handles future chaining and errors
-					rStep.runAsync(fPreviousExecution, rNextStep, rContinuation);
-				}
-				else
-				{
-					terminateCoroutine(rContinuation);
-				}
-			});
+			if (rStep != null) {
+				// forward to rStep which handles future chaining and errors
+				rStep.runAsync(previousExecution, nextStep, continuation);
+			} else {
+				terminateCoroutine(continuation);
+			}
+		});
 	}
 
 	/***************************************
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected O execute(I rInput, Continuation<?> rContinuation)
-	{
+	protected O execute(I input, Continuation<?> continuation) {
 		O rResult = null;
 
-		if (pCondition.test(rInput, rContinuation))
-		{
-			rResult = rRunIfTrue.runBlocking(rInput, rContinuation);
-		}
-		else if (rRunIfFalse != null)
-		{
-			rResult = rRunIfFalse.runBlocking(rInput, rContinuation);
+		if (pCondition.test(input, continuation)) {
+			rResult = rRunIfTrue.runBlocking(input, continuation);
+		} else if (rRunIfFalse != null) {
+			rResult = rRunIfFalse.runBlocking(input, continuation);
 		}
 
 		return rResult;

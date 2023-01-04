@@ -88,23 +88,23 @@ CoroutineScope.launch(scope -> {
     for (int i = 0; i < 1_000_000; i++) {
         crunchNumbers.runAsync(scope);
     }
-});
+}); 
 ```
 
 Any code that would follow after the scope launch block will only run after all coroutines have finished execution, either regularly or with an error. In the latter case the scope would also throw an exception if at least one coroutine fails.
 
 ### Continuation
 
-Each start of a coroutine produces a [Continuation](https://esoco.github.io/coroutines/javadoc/de/esoco/coroutine/Continuation.html) object that can be used to observe and if necessary cancel the asynchronous coroutine execution. If the coroutines has finished execution it provides access to the produced result (if such exists).
+Each start of a coroutine produces a [Continuation](https://esoco.github.io/coroutines/javadoc/de/esoco/coroutine/Continuation.html) object that can be used to observe and if necessary cancel the asynchronous coroutine execution. When the coroutine has finished execution it provides access to the produced result (if such exists).
 
 ### ScopeFuture 
 
 If a coroutine scope needs to produce a value it can be started by means of the `produce` method instead of `launch`. That method returns immediately with an instance of `java.util.concurrent.Future` which can then be used to monitor the scope execution and to query the result or error state after completion. This method can also be used if handling a scope through a future is preferred over a launch block. In any case the execution of the asynchronous code is contained and can be supervised by the application. A simple example:
 
 ```java
-Future<String> futureResult = 
-  produce(scope -> getScopeResult(scope), 
-          scope -> someCoroutine.runAsync(scope, "input"));
+Future<String> futureResult =
+	CoroutineScope.produce(scope -> getScopeResult(scope), 
+	                       scope -> someCoroutine.runAsync(scope, "input"));
 
 String result = futureResult.get();
 ```

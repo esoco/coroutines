@@ -16,41 +16,34 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
-/********************************************************************
+/**
  * A coroutine exception that is thrown if a closed channel is accessed.
  *
  * @author eso
  */
 public class ChannelClosedException extends CoroutineException {
-    //~ Static fields/initializers ---------------------------------------------
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    //~ Instance fields --------------------------------------------------------
+	private final ChannelId<?> channelId;
 
-    private final ChannelId<?> rChannelId;
+	/**
+	 * Creates a new instance.
+	 *
+	 * @param id The channel ID
+	 */
+	public ChannelClosedException(ChannelId<?> id) {
+		super("Channel %s is closed", id);
 
-    //~ Constructors -----------------------------------------------------------
+		channelId = id;
+	}
 
-    /***************************************
-     * Creates a new instance.
-     *
-     * @param rId The channel ID
-     */
-    public ChannelClosedException(ChannelId<?> rId) {
-        super("Channel %s is closed", rId);
-
-        rChannelId = rId;
-    }
-
-    //~ Methods ----------------------------------------------------------------
-
-    /***************************************
-     * Returns the channel id.
-     *
-     * @return The channel id
-     */
-    public ChannelId<?> getChannelId() {
-        return rChannelId;
-    }
+	/**
+	 * Returns the channel id.
+	 *
+	 * @return The channel id
+	 */
+	public ChannelId<?> getChannelId() {
+		return channelId;
+	}
 }

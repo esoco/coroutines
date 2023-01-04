@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 
-
 /********************************************************************
  * A coroutine step that suspends the coroutine execution until the results of
  * several other asynchronously executed coroutines are available. The results
@@ -46,14 +45,14 @@ import static java.util.Arrays.asList;
  *
  * @author eso
  */
-public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
-{
+public class Collect<I, O> extends CoroutineStep<I, Collection<O>> {
 	//~ Instance fields --------------------------------------------------------
 
-	private List<Coroutine<? super I, ? extends O>> aCoroutines =
+	private final List<Coroutine<? super I, ? extends O>> aCoroutines =
 		new ArrayList<>();
 
-	private Predicate<Continuation<?>> pCollectCritiera    = c -> true;
+	private Predicate<Continuation<?>> pCollectCritiera = c -> true;
+
 	private Predicate<Continuation<?>> pCompletionCritiera = c -> false;
 
 	//~ Constructors -----------------------------------------------------------
@@ -64,10 +63,8 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 * @param rFromCoroutines The coroutines to select from
 	 */
 	public Collect(
-		Collection<Coroutine<? super I, ? extends O>> rFromCoroutines)
-	{
-		if (rFromCoroutines.size() == 0)
-		{
+		Collection<Coroutine<? super I, ? extends O>> rFromCoroutines) {
+		if (rFromCoroutines.size() == 0) {
 			throw new IllegalArgumentException(
 				"At least one coroutine to collect is required");
 		}
@@ -80,11 +77,10 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 *
 	 * @param rOther The other instance
 	 */
-	private Collect(Collect<I, O> rOther)
-	{
+	private Collect(Collect<I, O> rOther) {
 		aCoroutines.addAll(rOther.aCoroutines);
 
-		pCollectCritiera    = rOther.pCollectCritiera;
+		pCollectCritiera = rOther.pCollectCritiera;
 		pCompletionCritiera = rOther.pCompletionCritiera;
 	}
 
@@ -105,8 +101,7 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 */
 	@SafeVarargs
 	public static <I, O> Collect<I, O> collect(
-		Coroutine<? super I, ? extends O>... rFromCoroutines)
-	{
+		Coroutine<? super I, ? extends O>... rFromCoroutines) {
 		return new Collect<I, O>(asList(rFromCoroutines));
 	}
 
@@ -121,10 +116,8 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 */
 	@SafeVarargs
 	public static <I, O> Collect<I, O> collect(
-		CoroutineStep<? super I, ? extends O>... rFromSteps)
-	{
-		return new Collect<>(
-			asList(rFromSteps).stream()
+		CoroutineStep<? super I, ? extends O>... rFromSteps) {
+		return new Collect<>(asList(rFromSteps).stream()
 			.map(rStep -> new Coroutine<>(rStep))
 			.collect(Collectors.toList()));
 	}
@@ -139,8 +132,7 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 *
 	 * @return The new instance
 	 */
-	public Collect<I, O> and(Coroutine<? super I, ? extends O> rCoroutine)
-	{
+	public Collect<I, O> and(Coroutine<? super I, ? extends O> rCoroutine) {
 		Collect<I, O> aCollect = new Collect<>(this);
 
 		aCollect.aCoroutines.add(rCoroutine);
@@ -157,8 +149,7 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 *
 	 * @return The new instance
 	 */
-	public Collect<I, O> and(CoroutineStep<? super I, ? extends O> rStep)
-	{
+	public Collect<I, O> and(CoroutineStep<? super I, ? extends O> rStep) {
 		Collect<I, O> aCollect = new Collect<>(this);
 
 		aCollect.aCoroutines.add(new Coroutine<>(rStep));
@@ -170,13 +161,11 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<I>			 fPreviousExecution,
-						 CoroutineStep<Collection<O>, ?> rNextStep,
-						 Continuation<?>				 rContinuation)
-	{
-		rContinuation.continueAccept(
-			fPreviousExecution,
-			rInput -> collectAsync(rInput, rNextStep, rContinuation));
+	public void runAsync(CompletableFuture<I> previousExecution,
+		CoroutineStep<Collection<O>, ?> nextStep,
+		Continuation<?> continuation) {
+		continuation.continueAccept(previousExecution,
+			rInput -> collectAsync(rInput, nextStep, continuation));
 	}
 
 	/***************************************
@@ -194,8 +183,7 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 *
 	 * @return A new step instance
 	 */
-	public Collect<I, O> until(Predicate<Continuation<?>> pCompletionCriteria)
-	{
+	public Collect<I, O> until(Predicate<Continuation<?>> pCompletionCriteria) {
 		Collect<I, O> aCollect = new Collect<>(aCoroutines);
 
 		aCollect.pCompletionCritiera = pCompletionCriteria;
@@ -213,8 +201,7 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 *
 	 * @return A new step instance
 	 */
-	public Collect<I, O> when(Predicate<Continuation<?>> pCollectCriteria)
-	{
+	public Collect<I, O> when(Predicate<Continuation<?>> pCollectCriteria) {
 		Collect<I, O> aCollect = new Collect<>(aCoroutines);
 
 		aCollect.pCollectCritiera = pCollectCriteria;
@@ -226,12 +213,11 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected Collection<O> execute(I rInput, Continuation<?> rContinuation)
-	{
+	protected Collection<O> execute(I input, Continuation<?> continuation) {
 		// even if executed blocking the selection must happen asynchronously,
 		// so we just run this step as a new coroutine in the current scope
-		return new Coroutine<>(this).runAsync(rContinuation.scope(), rInput)
-									.getResult();
+		return new Coroutine<>(this).runAsync(continuation.scope(), input)
+			.getResult();
 	}
 
 	/***************************************
@@ -241,23 +227,15 @@ public class Collect<I, O> extends CoroutineStep<I, Collection<O>>
 	 * @param rNextStep     The step to resume after the suspension
 	 * @param rContinuation the current continuation
 	 */
-	void collectAsync(I								  rInput,
-					  CoroutineStep<Collection<O>, ?> rNextStep,
-					  Continuation<?>				  rContinuation)
-	{
+	void collectAsync(I rInput, CoroutineStep<Collection<O>, ?> rNextStep,
+		Continuation<?> rContinuation) {
 		Selection<Collection<O>, O, Collection<O>> aSelection =
-			Selection.ofMultipleValues(
-				this,
-				rNextStep,
-				rContinuation,
-				pCompletionCritiera,
-				pCollectCritiera);
+			Selection.ofMultipleValues(this, rNextStep, rContinuation,
+				pCompletionCritiera, pCollectCritiera);
 
 		rContinuation.suspendTo(aSelection);
 
-		aCoroutines.forEach(
-			rCoroutine ->
-		{
+		aCoroutines.forEach(rCoroutine -> {
 			aSelection.add(rCoroutine.runAsync(rContinuation.scope(), rInput));
 		});
 

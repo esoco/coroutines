@@ -35,7 +35,7 @@ public abstract class ChannelStep<I, O> extends CoroutineStep<I, O>
 {
 	//~ Instance fields --------------------------------------------------------
 
-	private Function<Continuation<?>, ChannelId<O>> fGetChannelId;
+	private final Function<Continuation<?>, ChannelId<O>> fGetChannelId;
 
 	//~ Constructors -----------------------------------------------------------
 

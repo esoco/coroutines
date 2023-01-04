@@ -16,37 +16,38 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 package de.esoco.coroutine;
 
+import org.obrel.core.FluentRelatable;
+import org.obrel.core.ObjectRelations;
+import org.obrel.core.RelatedObject;
+import org.obrel.type.MetaTypes;
+
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 
-import org.obrel.core.FluentRelatable;
-import org.obrel.core.ObjectRelations;
-import org.obrel.core.RelatedObject;
-import org.obrel.type.MetaTypes;
-
 import static org.obrel.filter.RelationFilters.ifTypeNot;
 import static org.obrel.type.MetaTypes.IMMUTABLE;
 import static org.obrel.type.StandardTypes.NAME;
 
-/********************************************************************
+/**
  * A pure Java implementation of cooperative concurrency, also known as
  * coroutines. Coroutines implement lightweight multiprocessing where all
  * running coroutines share the available execution threads, shortly suspending
  * execution between processing steps to give other coroutines the chance to
- * execute. Furthermore coroutines can suspend their execution indefinitely when
- * waiting for other coroutines or external resources (e.g. data to be sent or
- * received), giving other code the chance to use the available threads.
+ * execute. Furthermore, coroutines can suspend their execution indefinitely
+ * when waiting for other coroutines or external resources (e.g. data to be sent
+ * or received), giving other code the chance to use the available threads.
  *
  * <p>
  * To achieve this functionality, the implementation makes use of several modern
  * Java features of which some are available starting with Java 8. The execution
  * of coroutine steps is done with {@link CompletableFuture} which in turn runs
- * the code by default in the {@link ForkJoinPool#commonPool() common thread
- * pool} defined in the {@link ForkJoinPool} class. But if necessary the
- * {@link Executor} used for running coroutines can be changed.
+ * the code by default in the
+ * {@link ForkJoinPool#commonPool() common thread pool} defined in the
+ * {@link ForkJoinPool} class. But if necessary the {@link Executor} used for
+ * running coroutines can be changed.
  * </p>
  *
  * <p>
@@ -61,12 +62,13 @@ import static org.obrel.type.StandardTypes.NAME;
  * From the outside a coroutine is a function that receives an input value,
  * processes it, and return an output value as the result of the execution. This
  * is similar to the {@link Function} interface introduced with Java 8. If
- * invoked {@link #runBlocking(CoroutineScope) blocking} it will behave exactly
- * like a standard function, blocking the current thread until the processing
- * has finished and the result value has been produced. But if invoked
- * {@link #runAsync(CoroutineScope) asynchronously} the coroutine will be
- * executed in parallel to the current thread, suspending it's execution shortly
- * between processing steps or even pausing until data is available.
+ * invoked {@link #runBlocking(CoroutineScope, Object)}  blocking} it will
+ * behave exactly like a standard function, blocking the current thread until
+ * the processing has finished and the result value has been produced. But if
+ * invoked {@link #runAsync(CoroutineScope, Object)}  asynchronously} the
+ * coroutine will be executed in parallel to the current thread, suspending it's
+ * execution shortly between processing steps or even pausing until data is
+ * available.
  * </p>
  *
  * <p>
@@ -86,7 +88,7 @@ import static org.obrel.type.StandardTypes.NAME;
  * coroutines. It also serves as a defined entry and exit-point into coroutine
  * executions: a scope will block execution of the launching thread until all
  * coroutines in it have finished execution (either successfully, by
- * cancelation, or with an error). This follows the pattern of <i>structured
+ * cancellation, or with an error). This follows the pattern of <i>structured
  * concurrency</i> which prevents "forgotten" executions running in the
  * background or terminating silently with an error. The scope also provides
  * configuration and shared state for the coroutines in it, overriding any
@@ -217,555 +219,389 @@ import static org.obrel.type.StandardTypes.NAME;
  * @author eso
  */
 public class Coroutine<I, O> extends RelatedObject
-    implements FluentRelatable<Coroutine<I, O>> {
-    //~ Instance fields --------------------------------------------------------
-
-    private StepChain<I, ?, O> aCode;
-
-    //~ Constructors -----------------------------------------------------------
-
-    /***************************************
-     * Creates a new instance that starts execution with a certain step.
-     *
-     * @param rFirstStep The first step to execute
-     */
-    public Coroutine(CoroutineStep<I, O> rFirstStep) {
-        Objects.requireNonNull(rFirstStep);
-
-        init(new StepChain<>(rFirstStep, new FinishStep<>()), null);
-    }
-
-    /***************************************
-     * Creates a new uninitialized instance.
-     */
-    Coroutine() {}
-
-    /***************************************
-     * Copies a coroutine for execution.
-     *
-     * @param rOther The coroutine to copy the definition from
-     */
-    private Coroutine(Coroutine<I, O> rOther) {
-        init(rOther.aCode, rOther);
-    }
-
-    /***************************************
-     * Internal constructor to create a new instance that is an extension of
-     * another coroutine.
-     *
-     * @param rOther    The other coroutine
-     * @param rNextStep The code to execute after that of the other coroutine
-     */
-    private <T> Coroutine(Coroutine<I, T> rOther,
-        CoroutineStep<T, O> rNextStep) {
-        Objects.requireNonNull(rNextStep);
-
-        init(rOther.aCode.then(rNextStep), rOther);
-    }
-
-    //~ Static methods ---------------------------------------------------------
-
-    /***************************************
-     * A factory method that creates a new coroutine which starts with the
-     * execution of a certain code function.
-     *
-     * @param rStep fCode The function containing the starting code of the
-     *              coroutine
-     *
-     * @return A new coroutine instance
-     */
-    public static <I, O> Coroutine<I, O> first(CoroutineStep<I, O> rStep) {
-        return new Coroutine<>(rStep);
-    }
-
-    /***************************************
-     * A variant of {@link #first(CoroutineStep)} that also sets an explicit
-     * step name. Naming steps can help debugging coroutines.
-     *
-     * @param sStepName A name that identifies this step in this coroutine
-     * @param rStep     The step to execute
-     *
-     * @return The new coroutine
-     */
-    public static <I, O> Coroutine<I, O> first(String sStepName,
-        CoroutineStep<I, O> rStep) {
-        return first(rStep.with(NAME, sStepName));
-    }
-
-    //~ Methods ----------------------------------------------------------------
-
-    /***************************************
-     * Runs a copy of this coroutine asynchronously in the given scope with an
-     * input value of NULL.
-     *
-     * @param rScope The scope to run in
-     *
-     * @return A {@link Continuation} that provides access to the execution
-     *         result
-     *
-     * @see #runAsync(CoroutineScope, Object)
-     */
-    public Continuation<O> runAsync(CoroutineScope rScope) {
-        return runAsync(rScope, null);
-    }
-
-    /***************************************
-     * Runs a copy of this coroutine asynchronously in a certain scope. This
-     * method returns a {@link Continuation} that contains the execution state
-     * and provides access to the coroutine result AFTER it finishes. Because
-     * the execution happens asynchronously (i.e. in another thread) the
-     * receiving code must always use the corresponding continuation methods to
-     * check for completion before accessing the continuation state.
-     *
-     * <p>
-     * Because a copy of this coroutine is executed, the continuation also
-     * references the copy and not this instance. If the running code tries to
-     * modify state of the coroutine it will only modify the copy, not the
-     * original instance.
-     * </p>
-     *
-     * <p>
-     * If multiple coroutines need to communicate through {@link Channel
-     * channels} they must run in the same context because channels are managed
-     * by the context based on the channel ID.
-     * </p>
-     *
-     * @param rScope The scope to run in
-     * @param rInput The input value
-     *
-     * @return A {@link Continuation} that provides access to the execution
-     *         result
-     */
-    @SuppressWarnings("unchecked")
-    public Continuation<O> runAsync(CoroutineScope rScope, I rInput) {
-        Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
-        Continuation<O> aContinuation =
-            new Continuation<>(rScope, aRunCoroutine);
-
-        CompletableFuture<I> fExecution =
-            CompletableFuture.supplyAsync(() -> rInput, aContinuation);
-
-        aRunCoroutine.aCode.runAsync(fExecution, null, aContinuation);
-
-        return aContinuation;
-    }
-
-    /***************************************
-     * Runs a copy of this coroutine in the given scope with an input value of
-     * NULL and blocks the current thread until the coroutine finished.
-     *
-     * @param rScope The scope to run in
-     *
-     * @return A {@link Continuation} that provides access to the execution
-     *         result
-     *
-     * @see #runBlocking(CoroutineScope, Object)
-     */
-    public Continuation<O> runBlocking(CoroutineScope rScope) {
-        return runBlocking(rScope, null);
-    }
-
-    /***************************************
-     * Runs a copy of this coroutine in a certain scope and blocks the current
-     * thread until the coroutine finished. Returns a {@link Continuation} that
-     * contains the execution state and provides access to the coroutine result.
-     *
-     * <p>
-     * Because a copy of this coroutine is executed, the continuation also
-     * references the copy and not this instance. If the running code tries to
-     * modify state of the coroutine it will only modify the copy, not the
-     * original instance.
-     * </p>
-     *
-     * @param rScope The scope to run in
-     * @param rInput The input value
-     *
-     * @return A {@link Continuation} that provides access to the execution
-     *         result
-     */
-    @SuppressWarnings("unchecked")
-    public Continuation<O> runBlocking(CoroutineScope rScope, I rInput) {
-        Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
-        Continuation<O> aContinuation =
-            new Continuation<>(rScope, aRunCoroutine);
-
-        aRunCoroutine.aCode.runBlocking(rInput, aContinuation);
-
-        return aContinuation;
-    }
-
-    /***************************************
-     * Returns a new coroutine that executes additional code after that of this
-     * instance. This and the related methods implement a builder pattern for
-     * coroutines. The initial coroutine is created with the first step, either
-     * from the static factory methods like {@link #first(CoroutineStep)} or
-     * with the public constructor. Invoking a builder method creates a new
-     * coroutine with the combined code while the original coroutine remains
-     * unchanged (or is discarded in the case of a builder chain).
-     *
-     * <p>
-     * Each invocation of a builder method creates a coroutine suspension point
-     * at which the execution will be interrupted to allow other code to run on
-     * the current thread (e.g. another coroutine). Some steps may suspend the
-     * execution until values from another coroutine or some external source
-     * become available.
-     * </p>
-     *
-     * <p>
-     * An extended coroutine re-uses the original code of the coroutine it is
-     * derived from. Therefore it is necessary to ensure that the code in shared
-     * (base) coroutines contains no external dependencies that could change the
-     * behavior of all derived coroutines if modified (unless desired, but
-     * beware of side-effects). The best way to achieve this is by using
-     * correctly defined closures when declaring step. If steps need to share
-     * information during execution that can be achieved by setting relations on
-     * the {@link Continuation} which is always local to the respective
-     * execution.
-     * </p>
-     *
-     * @param rStep The step to execute
-     *
-     * @return The new coroutine
-     */
-    public <T> Coroutine<I, T> then(CoroutineStep<O, T> rStep) {
-        return new Coroutine<>(this, rStep);
-    }
-
-    /***************************************
-     * A variant of {@link #then(CoroutineStep)} that also sets an explicit step
-     * name. Naming steps can help debugging coroutines.
-     *
-     * @param sStepName A name that identifies this step in this coroutine
-     * @param rStep     The step to execute
-     *
-     * @return The new coroutine
-     */
-    public <T> Coroutine<I, T> then(String sStepName,
-        CoroutineStep<O, T> rStep) {
-        return then(rStep.with(NAME, sStepName));
-    }
-
-    /***************************************
-     * {@inheritDoc}
-     */
-    @Override
-    public String toString() {
-        return String.format("%s[%s]", get(NAME), aCode);
-    }
-
-    /***************************************
-     * Returns the code.
-     *
-     * @return The code
-     */
-    StepChain<I, ?, O> getCode() {
-        return aCode;
-    }
-
-    /***************************************
-     * Initializes a new instance. Invoked from constructors.
-     *
-     * @param rCode  The code to be executed
-     * @param rOther Another coroutine to copy configuration data from or NULL
-     *               for none
-     */
-    void init(StepChain<I, ?, O> rCode, Coroutine<?, ?> rOther) {
-        aCode = rCode;
-
-        set(NAME, getClass().getSimpleName());
-
-        if (rOther != null) {
-            ObjectRelations.copyRelations(rOther, this, true,
-                ifTypeNot(IMMUTABLE));
-        }
-    }
-
-    /***************************************
-     * Terminates the asynchronous execution of this coroutine by invoking it's
-     * last step with an input value of NULL. This method should be invoked by
-     * steps that need to end the execution of their coroutine early (e.g. if a
-     * condition is not met).
-     *
-     * @param rContinuation The continuation of the execution
-     */
-    void terminate(Continuation<?> rContinuation) {
-        aCode.getLastStep()
-            .runAsync(CompletableFuture.supplyAsync(() -> null, rContinuation),
-                null, rContinuation);
-    }
-
-    //~ Inner Classes ----------------------------------------------------------
-
-    /********************************************************************
-     * A coroutine subclass for the invocation of coroutines as subroutines in
-     * the context of another execution.
-     *
-     * @author eso
-     */
-    public static class Subroutine<I, T, O> extends Coroutine<I, O> {
-        //~ Constructors -------------------------------------------------------
-
-        /***************************************
-         * Creates a new instance that invokes the code of another coroutine as
-         * a subroutine and then returns the control flow to a step in the
-         * invoking subroutine. The code of the original coroutine will be
-         * copied into this instance, not referenced directly.
-         *
-         * @param rCoroutine  The coroutine to invoke as a subroutine
-         * @param rReturnStep The step to return to after the subroutine
-         *                    execution
-         */
-        public Subroutine(Coroutine<I, T> rCoroutine,
-            CoroutineStep<T, O> rReturnStep) {
-            init(rCoroutine.aCode
-                .withLastStep(new SubroutineReturn<>(rReturnStep)), null);
-        }
-
-        //~ Methods ------------------------------------------------------------
-
-        /***************************************
-         * Executes this subroutine asynchronously in the given future and
-         * continuation.
-         *
-         * @param fExecution    The execution future
-         * @param rContinuation The continuation of the execution
-         */
-        public void runAsync(CompletableFuture<I> fExecution,
-            Continuation<?> rContinuation) {
-            rContinuation.subroutineStarted(this);
-
-            getCode().runAsync(fExecution, null, rContinuation);
-        }
-
-        /***************************************
-         * Executes this subroutine synchronously in the given continuation.
-         *
-         * @param rInput        The input value
-         * @param rContinuation The continuation of the execution
-         *
-         * @return The result of the execution
-         */
-        public O runBlocking(I rInput, Continuation<?> rContinuation) {
-            rContinuation.subroutineStarted(this);
-
-            return getCode().runBlocking(rInput, rContinuation);
-        }
-    }
-
-    /********************************************************************
-     * The final step of a coroutine execution that updates the state of the
-     * corresponding {@link Continuation}.
-     *
-     * @author eso
-     */
-    static class FinishStep<T> extends CoroutineStep<T, T> {
-        //~ Methods ------------------------------------------------------------
-
-        /***************************************
-         * {@inheritDoc}
-         */
-        @Override
-        @SuppressWarnings("unchecked")
-        protected T execute(T rResult, Continuation<?> rContinuation) {
-            // as this is the finish step, it must have the same type T as the
-            // continuation result
-            ((Continuation<T>) rContinuation).finish(rResult);
-
-            return rResult;
-        }
-    }
-
-    /********************************************************************
-     * A chain of an execution step and it's successor which may also be a step
-     * chain.
-     *
-     * @author eso
-     */
-    static class StepChain<I, T, O> extends CoroutineStep<I, O> {
-        //~ Instance fields ----------------------------------------------------
-
-        CoroutineStep<I, T> rFirstStep;
-
-        CoroutineStep<T, O> rNextStep;
-
-        //~ Constructors -------------------------------------------------------
-
-        /***************************************
-         * Creates a new instance.
-         *
-         * @param rCode The first execution
-         * @param rNext The second execution
-         */
-        private StepChain(CoroutineStep<I, T> rCode,
-            CoroutineStep<T, O> rNext) {
-            this.rFirstStep = rCode;
-            this.rNextStep  = rNext;
-        }
-
-        //~ Methods ------------------------------------------------------------
-
-        /***************************************
-         * {@inheritDoc}
-         */
-        @Override
-        public void runAsync(CompletableFuture<I> fPreviousExecution,
-            CoroutineStep<O, ?> rAlwaysNull, Continuation<?> rContinuation) {
-            if (!rContinuation.isCancelled()) {
-                try {
-                    rContinuation.trace(rFirstStep);
-
-                    // A step chain will always be a second step and is therefore
-                    // invoked with a next step argument of NULL. Therefore the next
-                    // step of the chain is used here.
-                    rFirstStep.runAsync(fPreviousExecution, rNextStep,
-                        rContinuation);
-                } catch (Throwable e) {
-                    rContinuation.fail(e);
-                }
-            }
-        }
-
-        /***************************************
-         * {@inheritDoc}
-         */
-        @Override
-        public String toString() {
-            return rFirstStep + " -> " + rNextStep;
-        }
-
-        /***************************************
-         * {@inheritDoc}
-         */
-        @Override
-        protected O execute(I rInput, Continuation<?> rContinuation) {
-            if (rContinuation.isCancelled()) {
-                return null;
-            } else {
-                try {
-                    rContinuation.trace(rFirstStep);
-
-                    return rNextStep.execute(
-                        rFirstStep.execute(rInput, rContinuation),
-                        rContinuation);
-                } catch (Throwable e) {
-                    rContinuation.fail(e);
-
-                    return null;
-                }
-            }
-        }
-
-        /***************************************
-         * Returns the last step in this chain.
-         *
-         * @return The last step
-         */
-        CoroutineStep<?, ?> getLastStep() {
-            if (rNextStep instanceof StepChain) {
-                return ((StepChain<?, ?, ?>) rNextStep).getLastStep();
-            } else {
-                return rNextStep;
-            }
-        }
-
-        /***************************************
-         * Returns an extended {@link StepChain} that invokes a certain step at
-         * the end.
-         *
-         * @param rStep rStep The next step to invoke
-         *
-         * @return The new invocation
-         */
-        @SuppressWarnings({ "unchecked", "rawtypes" })
-        <R> StepChain<I, T, R> then(CoroutineStep<O, R> rStep) {
-            StepChain<I, T, R> aChainedInvocation =
-                new StepChain<>(rFirstStep, null);
-
-            if (rNextStep instanceof StepChain) {
-                // Chains need to be accessed as raw types because the
-                // intermediate type of the chain in rNextStep is unknown
-                aChainedInvocation.rNextStep =
-                    ((StepChain) rNextStep).then(rStep);
-            } else {
-                // rNextStep is either another StepChain (see above) or else the
-                // FinishStep which must be invoked last. Raw type is necessary
-                // because the type of THIS is actually <I,O,O> as FinishStep is
-                // an identity step, but this type info is not available here.
-                aChainedInvocation.rNextStep = new StepChain(rStep, rNextStep);
-            }
-            return aChainedInvocation;
-        }
-
-        /***************************************
-         * Returns a copy of this {@link StepChain} with the last (finish) step
-         * replaced with the argument step.
-         *
-         * @param rStep rStep The last step to invoke
-         *
-         * @return The new invocation
-         */
-        @SuppressWarnings({ "unchecked", "rawtypes" })
-        <R> StepChain<I, T, R> withLastStep(CoroutineStep<?, R> rStep) {
-            StepChain<I, T, R> aChainedInvocation =
-                new StepChain<>(rFirstStep, null);
-
-            if (rNextStep instanceof StepChain) {
-                // Chains need to be accessed as raw types because the
-                // intermediate type of the chain in rNextStep is unknown
-                aChainedInvocation.rNextStep =
-                    ((StepChain) rNextStep).withLastStep(rStep);
-            } else {
-                // step needs to be cast because the actual types at the end of
-                // the chain are not known here
-                aChainedInvocation.rNextStep = (CoroutineStep<T, R>) rStep;
-            }
-            return aChainedInvocation;
-        }
-    }
-
-    /********************************************************************
-     * The final step of a coroutine execution inside another coroutine.
-     *
-     * @author eso
-     */
-    static class SubroutineReturn<I, O> extends CoroutineStep<I, O> {
-        //~ Instance fields ----------------------------------------------------
-
-        private CoroutineStep<I, O> rReturnStep;
-
-        //~ Constructors -------------------------------------------------------
-
-        /***************************************
-         * Sets the return step.
-         *
-         * @param rReturnStep The new return step
-         */
-        public SubroutineReturn(CoroutineStep<I, O> rReturnStep) {
-            this.rReturnStep = rReturnStep;
-        }
-
-        //~ Methods ------------------------------------------------------------
-
-        /***************************************
-         * {@inheritDoc}
-         */
-        @Override
-        public void runAsync(CompletableFuture<I> fPreviousExecution,
-            CoroutineStep<O, ?> rNextStep, Continuation<?> rContinuation) {
-            rContinuation.subroutineFinished();
-
-            rReturnStep.runAsync(fPreviousExecution, rNextStep, rContinuation);
-        }
-
-        /***************************************
-         * {@inheritDoc}
-         */
-        @Override
-        @SuppressWarnings("unchecked")
-        protected O execute(I rResult, Continuation<?> rContinuation) {
-            rContinuation.subroutineFinished();
-
-            return rReturnStep.execute(rResult, rContinuation);
-        }
-    }
+	implements FluentRelatable<Coroutine<I, O>> {
+
+	private StepChain<I, ?, O> code;
+
+	/**
+	 * Creates a new instance that starts execution with a certain step.
+	 *
+	 * @param firstStep The first step to execute
+	 */
+	public Coroutine(CoroutineStep<I, O> firstStep) {
+		Objects.requireNonNull(firstStep);
+
+		init(new StepChain<>(firstStep, new FinishStep<>()), null);
+	}
+
+	/**
+	 * Creates a new uninitialized instance.
+	 */
+	Coroutine() {
+	}
+
+	/**
+	 * Copies a coroutine for execution.
+	 *
+	 * @param other The coroutine to copy the definition from
+	 */
+	private Coroutine(Coroutine<I, O> other) {
+		init(other.code, other);
+	}
+
+	/**
+	 * Internal constructor to create a new instance that is an extension of
+	 * another coroutine.
+	 *
+	 * @param other    The other coroutine
+	 * @param nextStep The code to execute after that of the other coroutine
+	 */
+	private <T> Coroutine(Coroutine<I, T> other, CoroutineStep<T, O> nextStep) {
+		Objects.requireNonNull(nextStep);
+
+		init(other.code.then(nextStep), other);
+	}
+
+	/**
+	 * A factory method that creates a new coroutine which starts with the
+	 * execution of a certain code function.
+	 *
+	 * @param step fCode The function containing the starting code of the
+	 *             coroutine
+	 * @return A new coroutine instance
+	 */
+	public static <I, O> Coroutine<I, O> first(CoroutineStep<I, O> step) {
+		return new Coroutine<>(step);
+	}
+
+	/**
+	 * A variant of {@link #first(CoroutineStep)} that also sets an explicit
+	 * step name. Naming steps can help debugging coroutines.
+	 *
+	 * @param stepName A name that identifies this step in this coroutine
+	 * @param step     The step to execute
+	 * @return The new coroutine
+	 */
+	public static <I, O> Coroutine<I, O> first(String stepName,
+		CoroutineStep<I, O> step) {
+		return first(step.with(NAME, stepName));
+	}
+
+	/**
+	 * Runs a copy of this coroutine asynchronously in a certain scope. This
+	 * method returns a {@link Continuation} that contains the execution state
+	 * and provides access to the coroutine result AFTER it finishes. Because
+	 * the execution happens asynchronously (i.e. in another thread) the
+	 * receiving code must always use the corresponding continuation methods to
+	 * check for completion before accessing the continuation state.
+	 *
+	 * <p>
+	 * Because a copy of this coroutine is executed, the continuation also
+	 * references the copy and not this instance. If the running code tries to
+	 * modify state of the coroutine it will only modify the copy, not the
+	 * original instance.
+	 * </p>
+	 *
+	 * <p>
+	 * If multiple coroutines need to communicate through
+	 * {@link Channel channels} they must run in the same context because
+	 * channels are managed by the context based on the channel ID.
+	 * </p>
+	 *
+	 * @param scope The scope to run in
+	 * @param input The input value
+	 * @return A {@link Continuation} that provides access to the execution
+	 * result
+	 */
+	public Continuation<O> runAsync(CoroutineScope scope, I input) {
+		Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
+		Continuation<O> aContinuation =
+			new Continuation<>(scope, aRunCoroutine);
+
+		CompletableFuture<I> fExecution =
+			CompletableFuture.supplyAsync(() -> input, aContinuation);
+
+		aRunCoroutine.code.runAsync(fExecution, null, aContinuation);
+
+		return aContinuation;
+	}
+
+	/**
+	 * Runs a copy of this coroutine in a certain scope and blocks the current
+	 * thread until the coroutine finished. Returns a {@link Continuation} that
+	 * contains the execution state and provides access to the coroutine
+	 * result.
+	 *
+	 * <p>
+	 * Because a copy of this coroutine is executed, the continuation also
+	 * references the copy and not this instance. If the running code tries to
+	 * modify state of the coroutine it will only modify the copy, not the
+	 * original instance.
+	 * </p>
+	 *
+	 * @param scope The scope to run in
+	 * @param input The input value
+	 * @return A {@link Continuation} that provides access to the execution
+	 * result
+	 */
+	public Continuation<O> runBlocking(CoroutineScope scope, I input) {
+		Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
+		Continuation<O> aContinuation =
+			new Continuation<>(scope, aRunCoroutine);
+
+		aRunCoroutine.code.runBlocking(input, aContinuation);
+
+		return aContinuation;
+	}
+
+	/**
+	 * Returns a new coroutine that executes additional code after that of this
+	 * instance. This and the related methods implement a builder pattern for
+	 * coroutines. The initial coroutine is created with the first step, either
+	 * from the static factory methods like {@link #first(CoroutineStep)} or
+	 * with the public constructor. Invoking a builder method creates a new
+	 * coroutine with the combined code while the original coroutine remains
+	 * unchanged (or is discarded in the case of a builder chain).
+	 *
+	 * <p>
+	 * Each invocation of a builder method creates a coroutine suspension point
+	 * at which the execution will be interrupted to allow other code to run on
+	 * the current thread (e.g. another coroutine). Some steps may suspend the
+	 * execution until values from another coroutine or some external source
+	 * become available.
+	 * </p>
+	 *
+	 * <p>
+	 * An extended coroutine re-uses the original code of the coroutine it is
+	 * derived from. Therefore it is necessary to ensure that the code in shared
+	 * (base) coroutines contains no external dependencies that could change the
+	 * behavior of all derived coroutines if modified (unless desired, but
+	 * beware of side-effects). The best way to achieve this is by using
+	 * correctly defined closures when declaring step. If steps need to share
+	 * information during execution that can be achieved by setting relations on
+	 * the {@link Continuation} which is always local to the respective
+	 * execution.
+	 * </p>
+	 *
+	 * @param step The step to execute
+	 * @return The new coroutine
+	 */
+	public <T> Coroutine<I, T> then(CoroutineStep<O, T> step) {
+		return new Coroutine<>(this, step);
+	}
+
+	/**
+	 * A variant of {@link #then(CoroutineStep)} that also sets an explicit step
+	 * name. Naming steps can help debugging coroutines.
+	 *
+	 * @param stepName A name that identifies this step in this coroutine
+	 * @param step     The step to execute
+	 * @return The new coroutine
+	 */
+	public <T> Coroutine<I, T> then(String stepName, CoroutineStep<O, T> step) {
+		return then(step.with(NAME, stepName));
+	}
+
+	@Override
+	public String toString() {
+		return String.format("%s[%s]", get(NAME), code);
+	}
+
+	/**
+	 * Returns the {@link StepChain} object containing the code of this
+	 * coroutine.
+	 */
+	StepChain<I, ?, O> getCode() {
+		return code;
+	}
+
+	/**
+	 * Initializes a new instance. Invoked from constructors.
+	 *
+	 * @param code  The code to be executed
+	 * @param other Another coroutine to copy configuration data from or NULL
+	 *              for none
+	 */
+	void init(StepChain<I, ?, O> code, Coroutine<?, ?> other) {
+		this.code = code;
+
+		set(NAME, getClass().getSimpleName());
+
+		if (other != null) {
+			ObjectRelations.copyRelations(other, this, true,
+				ifTypeNot(IMMUTABLE));
+		}
+	}
+
+	/**
+	 * Terminates the asynchronous execution of this coroutine by invoking it's
+	 * last step with an input value of NULL. This method should be invoked by
+	 * steps that need to end the execution of their coroutine early (e.g. if a
+	 * condition is not met).
+	 *
+	 * @param continuation The continuation of the execution
+	 */
+	void terminate(Continuation<?> continuation) {
+		code.getLastStep()
+			.runAsync(CompletableFuture.supplyAsync(() -> null, continuation),
+				null, continuation);
+	}
+
+	/**
+	 * The final step of a coroutine execution that updates the state of the
+	 * corresponding {@link Continuation}.
+	 *
+	 * @author eso
+	 */
+	static class FinishStep<T> extends CoroutineStep<T, T> {
+
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		@SuppressWarnings("unchecked")
+		protected T execute(T input, Continuation<?> continuation) {
+			// as this is the finish step, it must have the same type T as the
+			// continuation result
+			((Continuation<T>) continuation).finish(input);
+
+			return input;
+		}
+	}
+
+	/**
+	 * A chaining of two coroutine steps. Next steps can also be step chains, so
+	 * that arbitrary complex call sequences can be created.
+	 *
+	 * @author eso
+	 */
+	static class StepChain<I, T, O> extends CoroutineStep<I, O> {
+
+		CoroutineStep<I, T> step;
+
+		CoroutineStep<T, O> next;
+
+		/**
+		 * Creates a new instance.
+		 *
+		 * @param step The first execution
+		 * @param next The second execution
+		 */
+		private StepChain(CoroutineStep<I, T> step, CoroutineStep<T, O> next) {
+			this.step = step;
+			this.next = next;
+		}
+
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public void runAsync(CompletableFuture<I> previousExecution,
+			CoroutineStep<O, ?> nextStep, Continuation<?> continuation) {
+			if (!continuation.isCancelled()) {
+				try {
+					continuation.trace(step);
+
+					// A step chain will always be a second step and is thus
+					// invoked with a next step argument of NULL. Therefore, the
+					// next step of the chain is used here.
+					step.runAsync(previousExecution, next, continuation);
+				} catch (Throwable e) {
+					continuation.fail(e);
+				}
+			}
+		}
+
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public String toString() {
+			return step + " -> " + next;
+		}
+
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		protected O execute(I input, Continuation<?> continuation) {
+			if (continuation.isCancelled()) {
+				return null;
+			} else {
+				try {
+					continuation.trace(step);
+
+					return next.execute(step.execute(input, continuation),
+						continuation);
+				} catch (Throwable e) {
+					continuation.fail(e);
+
+					return null;
+				}
+			}
+		}
+
+		/**
+		 * Returns the last step in this chain.
+		 *
+		 * @return The last step
+		 */
+		CoroutineStep<?, ?> getLastStep() {
+			if (next instanceof StepChain) {
+				return ((StepChain<?, ?, ?>) next).getLastStep();
+			} else {
+				return next;
+			}
+		}
+
+		/**
+		 * Returns an extended {@link StepChain} that invokes a certain step at
+		 * the end.
+		 *
+		 * @param step The next step to invoke
+		 * @return The new invocation
+		 */
+		@SuppressWarnings({ "unchecked", "rawtypes" })
+		<R> StepChain<I, T, R> then(CoroutineStep<O, R> step) {
+			StepChain<I, T, R> aChainedInvocation =
+				new StepChain<>(this.step, null);
+
+			if (next instanceof StepChain) {
+				// Chains need to be accessed as raw types because the
+				// intermediate type of the chain in rNextStep is unknown
+				aChainedInvocation.next = ((StepChain) next).then(step);
+			} else {
+				// rNextStep is either another StepChain (see above) or else the
+				// FinishStep which must be invoked last. Raw type is necessary
+				// because the type of THIS is actually <I,O,O> as FinishStep is
+				// an identity step, but this type info is not available here.
+				aChainedInvocation.next = new StepChain(step, next);
+			}
+			return aChainedInvocation;
+		}
+
+		/**
+		 * Returns a copy of this {@link StepChain} with the last (finish) step
+		 * replaced with the argument step.
+		 *
+		 * @param step The last step to invoke
+		 * @return The new invocation
+		 */
+		@SuppressWarnings({ "unchecked", "rawtypes" })
+		<R> StepChain<I, T, R> withLastStep(CoroutineStep<?, R> step) {
+			StepChain<I, T, R> aChainedInvocation =
+				new StepChain<>(this.step, null);
+
+			if (next instanceof StepChain) {
+				// Chains need to be accessed as raw types because the
+				// intermediate type of the chain in rNextStep is unknown
+				aChainedInvocation.next = ((StepChain) next).withLastStep(step);
+			} else {
+				// step needs to be cast because the actual types at the end of
+				// the chain are not known here
+				aChainedInvocation.next = (CoroutineStep<T, R>) step;
+			}
+			return aChainedInvocation;
+		}
+	}
 }

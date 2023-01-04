@@ -23,35 +23,28 @@ import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.file.OpenOption;
 import java.nio.file.StandardOpenOption;
-
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
-
-/********************************************************************
+/**
  * Implements asynchronous writing to a {@link AsynchronousFileChannel}.
  *
  * @author eso
  */
-public class FileWrite extends AsynchronousFileStep
-{
-	//~ Constructors -----------------------------------------------------------
+public class FileWrite extends AsynchronousFileStep {
 
-	/***************************************
+	/**
 	 * Creates a new instance.
 	 *
-	 * @param fGetFileChannel A function that provides the file channel from the
-	 *                        current continuation
+	 * @param getFileChannel A function that provides the file channel from the
+	 *                       current continuation
 	 */
 	public FileWrite(
-		Function<Continuation<?>, AsynchronousFileChannel> fGetFileChannel)
-	{
-		super(fGetFileChannel);
+		Function<Continuation<?>, AsynchronousFileChannel> getFileChannel) {
+		super(getFileChannel);
 	}
 
-	//~ Static methods ---------------------------------------------------------
-
-	/***************************************
+	/**
 	 * Suspends until all data from the input {@link ByteBuffer} has been
 	 * written to a file.The buffer must be initialized for sending, i.e. if
 	 * necessary a call to {@link Buffer#flip()} must have been performed.
@@ -60,91 +53,65 @@ public class FileWrite extends AsynchronousFileStep
 	 * be invoked on the buffer so that it can be used directly for subsequent
 	 * writing to it.</p>
 	 *
-	 * @param  fGetFileChannel A function that provides the file channel from
-	 *                         the current continuation
-	 *
+	 * @param getFileChannel A function that provides the file channel from the
+	 *                       current continuation
 	 * @return A new step instance
 	 */
 	public static FileWrite writeTo(
-		Function<Continuation<?>, AsynchronousFileChannel> fGetFileChannel)
-	{
-		return new FileWrite(fGetFileChannel);
+		Function<Continuation<?>, AsynchronousFileChannel> getFileChannel) {
+		return new FileWrite(getFileChannel);
 	}
 
-	/***************************************
+	/**
 	 * Invokes {@link #writeTo(Function)} with a function that opens a file
-	 * channel with the given file name and options. The option {@link
-	 * StandardOpenOption#WRITE} will always be used and should therefore not
-	 * occur in the extra options.
+	 * channel with the given file name and options. The option
+	 * {@link StandardOpenOption#WRITE} will always be used and should therefore
+	 * not occur in the extra options.
 	 *
-	 * @param  sFileName     The name of the file to read from
-	 * @param  rExtraOptions Additional options to use besides {@link
-	 *                       StandardOpenOption#WRITE}
-	 *
+	 * @param fileName     The name of the file to read from
+	 * @param extraOptions Additional options to use besides
+	 *                     {@link StandardOpenOption#WRITE}
 	 * @return A new step instance
 	 */
-	public static FileWrite writeTo(
-		String		  sFileName,
-		OpenOption... rExtraOptions)
-	{
-		return writeTo(
-			c -> openFileChannel(
-					sFileName,
-					StandardOpenOption.WRITE,
-					rExtraOptions));
+	public static FileWrite writeTo(String fileName,
+		OpenOption... extraOptions) {
+		return writeTo(c -> openFileChannel(fileName, StandardOpenOption.WRITE,
+			extraOptions));
 	}
 
-	//~ Methods ----------------------------------------------------------------
-
-	/***************************************
-	 * {@inheritDoc}
-	 */
 	@Override
-	protected boolean performAsyncOperation(
-		int												  nBytesWritten,
-		AsynchronousFileChannel							  rChannel,
-		ByteBuffer										  rData,
-		ChannelCallback<Integer, AsynchronousFileChannel> rCallback)
-	{
-		long nPosition = get(FILE_POSITION);
+	protected boolean performAsyncOperation(int bytesWritten,
+		AsynchronousFileChannel channel, ByteBuffer data,
+		ChannelCallback<Integer, AsynchronousFileChannel> callback) {
+		long position = get(FILE_POSITION);
 
-		if (rData.hasRemaining())
-		{
-			if (nBytesWritten > 0)
-			{
-				nPosition += nBytesWritten;
+		if (data.hasRemaining()) {
+			if (bytesWritten > 0) {
+				position += bytesWritten;
 			}
 
-			rChannel.write(rData, nPosition, rData, rCallback);
+			channel.write(data, position, data, callback);
 
 			return false;
-		}
-		else // finished
+		} else // finished
 		{
 			// remove position in the case of a later restart
 			deleteRelation(FILE_POSITION);
-			rData.clear();
+			data.clear();
 
 			return true;
 		}
 	}
 
-	/***************************************
-	 * {@inheritDoc}
-	 */
 	@Override
-	protected void performBlockingOperation(
-		AsynchronousFileChannel aChannel,
-		ByteBuffer				rData) throws InterruptedException,
-											  ExecutionException
-	{
-		long nPosition = 0;
+	protected void performBlockingOperation(AsynchronousFileChannel channel,
+		ByteBuffer data) throws InterruptedException, ExecutionException {
+		long position = 0;
 
-		while (rData.hasRemaining())
-		{
-			nPosition += aChannel.write(rData, nPosition).get();
+		while (data.hasRemaining()) {
+			position += channel.write(data, position).get();
 		}
 
-		rData.clear();
+		data.clear();
 	}
 }

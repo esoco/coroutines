@@ -1,48 +1,32 @@
-apply plugin: 'java-library'
-apply plugin: 'eclipse'
+plugins {
+    id "java-library"
+    id 'pl.allegro.tech.build.axion-release' version "$axionReleaseVersion"
+}
 
-project.group   = 'de.esoco'
+project.group = 'de.esoco'
+project.version = scmVersion.version
 
 sourceCompatibility = 1.8
 
-repositories
-{
+repositories {
+    mavenCentral()
     jcenter()
 }
 
-// substitute local project dependencies if available
-configurations.all {
-	resolutionStrategy.dependencySubstitution.all { DependencySubstitution dependency ->
-		if (dependency.requested instanceof ModuleComponentSelector &&
-			["org.obrel" ,"de.esoco"].contains(dependency.requested.group)) {
-			def targetProject = findProject(":${dependency.requested.module}")
-			if (targetProject != null) {
-				dependency.useTarget (targetProject, "prefer local project")
-				if (name.startsWith("compile")) // only log once
-					println "$project.name using local project $targetProject as dependency"
-			}
-		}
-	}
-}
+dependencies {
+    api "org.obrel:objectrelations:$obrelVersion"
 
-dependencies
-{
-	api 'org.obrel:objectrelations:1.4.1'
+    implementation "org.reactivestreams:reactive-streams:$reactiveStreamsVersion"
 
-	testImplementation platform('org.junit:junit-bom:5.5.2')	
-	testImplementation 'org.junit.jupiter:junit-jupiter'
-	testImplementation 'junit:junit:4.12'
-	
-	testRuntimeOnly 'org.junit.vintage:junit-vintage-engine' // JUnit4 support
+    testImplementation platform("org.junit:junit-bom:$junitVersion")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
 }
 
 task sourceJar(type: Jar, dependsOn: classes) {
-    classifier = 'sources'
     from sourceSets.main.allSource
 }
 
 task javadocJar(type: Jar, dependsOn: javadoc) {
-    classifier = 'javadoc'
     from javadoc.destinationDir
 }
 
@@ -54,36 +38,10 @@ artifacts {
 tasks.withType(Javadoc) {
     failOnError = false
     options.addBooleanOption('quiet', true)
-    
+
     if (JavaVersion.current().isJava8Compatible()) {
-        options.addBooleanOption('Xdoclint:none', true) 
+        options.addBooleanOption('Xdoclint:none', true)
     }
 }
 
-// ----------- Bintray Release -----------
-
-buildscript {
-    repositories { jcenter() }
-    dependencies { classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7' }
-}
-apply plugin: 'com.jfrog.bintray'
-apply plugin: 'maven'
-
-bintray {
-	user = project.hasProperty('bintrayUser') ?
-				project.property('bintrayUser') :
-				System.getenv('BINTRAY_USER')
-	key = project.hasProperty('bintrayApiKey') ?
-				project.property('bintrayApiKey') :
-				System.getenv('BINTRAY_API_KEY')
-    configurations = ['archives']
-    publish = true
-
-	pkg {
-		repo = 'sdack'
-		name = project.name
-		version {
-			name = project.version
-	    }
-    }
-}
+test { useJUnitPlatform() }

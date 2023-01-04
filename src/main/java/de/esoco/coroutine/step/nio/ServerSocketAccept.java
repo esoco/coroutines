@@ -22,35 +22,31 @@ import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspension;
 import de.esoco.coroutine.step.Loop;
-
-import java.io.IOException;
-
-import java.net.SocketAddress;
-
-import java.nio.channels.AsynchronousServerSocketChannel;
-import java.nio.channels.AsynchronousSocketChannel;
-import java.nio.channels.Channel;
-import java.nio.channels.CompletionHandler;
-
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
-
 import org.obrel.core.RelationType;
 import org.obrel.core.RelationTypes;
 import org.obrel.type.MetaTypes;
 
+import java.io.IOException;
+import java.net.SocketAddress;
+import java.nio.channels.AsynchronousServerSocketChannel;
+import java.nio.channels.AsynchronousSocketChannel;
+import java.nio.channels.Channel;
+import java.nio.channels.CompletionHandler;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+
 import static org.obrel.core.RelationTypes.newType;
 
-
-/********************************************************************
+/**
  * A coroutine step for servers that listens to network request through an
  * instance of {@link AsynchronousServerSocketChannel}. The step will suspend
  * execution until a request is accepted and then spawn another coroutine for
- * the handling of the request. The handling coroutine will receive the {@link
- * AsynchronousSocketChannel} for the communication with the client. It could
- * then store the channel as {@link AsynchronousSocketStep#SOCKET_CHANNEL} and
- * process the request with {@link SocketReceive} and {@link SocketSend} steps.
+ * the handling of the request. The handling coroutine will receive the
+ * {@link AsynchronousSocketChannel} for the communication with the client. It
+ * could then store the channel as {@link AsynchronousSocketStep#SOCKET_CHANNEL}
+ * and process the request with {@link SocketReceive} and {@link SocketSend}
+ * steps.
  *
  * <p>After the request handling coroutine has been spawned this step will
  * resume execution of it's own coroutine. A typical server accept loop
@@ -62,197 +58,160 @@ import static org.obrel.core.RelationTypes.newType;
  *
  * @author eso
  */
-public class ServerSocketAccept extends AsynchronousChannelStep<Void, Void>
-{
-	//~ Static fields/initializers ---------------------------------------------
+public class ServerSocketAccept extends AsynchronousChannelStep<Void, Void> {
 
 	/**
 	 * State: an {@link AsynchronousServerSocketChannel} that has been openened
 	 * and connected by an asynchronous execution.
 	 */
-	public static final RelationType<AsynchronousServerSocketChannel> SERVER_SOCKET_CHANNEL =
-		newType();
+	public static final RelationType<AsynchronousServerSocketChannel>
+		SERVER_SOCKET_CHANNEL = newType();
 
-	static
-	{
+	static {
 		RelationTypes.init(ServerSocketAccept.class);
 	}
 
-	//~ Instance fields --------------------------------------------------------
+	private final Function<Continuation<?>, SocketAddress> getSocketAddress;
 
-	private final Function<Continuation<?>, SocketAddress> fGetSocketAddress;
-	private Coroutine<AsynchronousSocketChannel, ?>		   rRequestHandler;
+	private final Coroutine<AsynchronousSocketChannel, ?> requestHandler;
 
-	//~ Constructors -----------------------------------------------------------
-
-	/***************************************
+	/**
 	 * Creates a new instance that accepts a single server request and processes
 	 * it asynchronously in a coroutine. The server socket is bound to the local
 	 * socket with the address provided by the given factory. The factory may
 	 * return NULL if the step should connect to a channel that is stored in a
 	 * state relation with the type {@link #SERVER_SOCKET_CHANNEL}.
 	 *
-	 * @param fGetSocketAddress A function that provides the socket address to
-	 *                          connect to from the current continuation
-	 * @param rRequestHandler   A coroutine that processes a single server
-	 *                          request
+	 * @param getSocketAddress A function that provides the socket address to
+	 *                         connect to from the current continuation
+	 * @param requestHandler   A coroutine that processes a single server
+	 *                         request
 	 */
 	public ServerSocketAccept(
-		Function<Continuation<?>, SocketAddress> fGetSocketAddress,
-		Coroutine<AsynchronousSocketChannel, ?>  rRequestHandler)
-	{
-		Objects.requireNonNull(fGetSocketAddress);
+		Function<Continuation<?>, SocketAddress> getSocketAddress,
+		Coroutine<AsynchronousSocketChannel, ?> requestHandler) {
+		Objects.requireNonNull(getSocketAddress);
 
-		this.fGetSocketAddress = fGetSocketAddress;
-		this.rRequestHandler   = rRequestHandler;
+		this.getSocketAddress = getSocketAddress;
+		this.requestHandler = requestHandler;
 	}
 
-	//~ Static methods ---------------------------------------------------------
-
-	/***************************************
+	/**
 	 * Accepts an incoming request on the given socket address and then handles
 	 * it by executing the given coroutine with the client socket channel as
 	 * it's input.
 	 *
-	 * @param  fGetSocketAddress A function that produces the address of the
-	 *                           local address to accept the request from
-	 * @param  rRequestHandler   The coroutine to process the next request with
-	 *
+	 * @param getSocketAddress A function that produces the address of the local
+	 *                         address to accept the request from
+	 * @param requestHandler   The coroutine to process the next request with
 	 * @return The new step
 	 */
 	public static ServerSocketAccept acceptRequestOn(
-		Function<Continuation<?>, SocketAddress> fGetSocketAddress,
-		Coroutine<AsynchronousSocketChannel, ?>  rRequestHandler)
-	{
-		return new ServerSocketAccept(fGetSocketAddress, rRequestHandler);
+		Function<Continuation<?>, SocketAddress> getSocketAddress,
+		Coroutine<AsynchronousSocketChannel, ?> requestHandler) {
+		return new ServerSocketAccept(getSocketAddress, requestHandler);
 	}
 
-	//~ Methods ----------------------------------------------------------------
-
-	/***************************************
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<Void> fPreviousExecution,
-						 CoroutineStep<Void, ?>  rNextStep,
-						 Continuation<?>		 rContinuation)
-	{
-		rContinuation.continueAccept(
-			fPreviousExecution,
-			v -> acceptAsync(rContinuation.suspend(this, rNextStep)));
+	public void runAsync(CompletableFuture<Void> previousExecution,
+		CoroutineStep<Void, ?> nextStep, Continuation<?> continuation) {
+		continuation.continueAccept(previousExecution,
+			v -> acceptAsync(continuation.suspend(this, nextStep)));
 	}
 
-	/***************************************
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected Void execute(Void rData, Continuation<?> rContinuation)
-	{
-		try
-		{
+	protected Void execute(Void input, Continuation<?> continuation) {
+		try {
 			AsynchronousServerSocketChannel rChannel =
-				getServerSocketChannel(rContinuation);
+				getServerSocketChannel(continuation);
 
-			rRequestHandler.runBlocking(
-				rContinuation.scope(),
+			requestHandler.runBlocking(continuation.scope(),
 				rChannel.accept().get());
-		}
-		catch (Exception e)
-		{
+		} catch (Exception e) {
 			throw new CoroutineException(e);
 		}
 
 		return null;
 	}
 
-	/***************************************
+	/**
 	 * Returns the channel to be used by this step. This first checks the
 	 * currently exexcuting coroutine in the continuation parameter for an
 	 * existing {@link #SERVER_SOCKET_CHANNEL} relation. If that doesn't exists
-	 * or if it contains a closed channel a new {@link
-	 * AsynchronousServerSocketChannel} will be opened and stored in the state
-	 * object.
+	 * or if it contains a closed channel a new
+	 * {@link AsynchronousServerSocketChannel} will be opened and stored in the
+	 * state object.
 	 *
-	 * @param  rContinuation The continuation to query for an existing channel
-	 *
+	 * @param continuation The continuation to query for an existing channel
 	 * @return The channel
-	 *
 	 * @throws IOException If opening the channel fails
 	 */
 	protected AsynchronousServerSocketChannel getServerSocketChannel(
-		Continuation<?> rContinuation) throws IOException
-	{
-		Coroutine<?, ?> rCoroutine = rContinuation.getCurrentCoroutine();
+		Continuation<?> continuation) throws IOException {
+		Coroutine<?, ?> coroutine = continuation.getCurrentCoroutine();
 
-		AsynchronousServerSocketChannel rChannel =
-			rCoroutine.get(SERVER_SOCKET_CHANNEL);
+		AsynchronousServerSocketChannel channel =
+			coroutine.get(SERVER_SOCKET_CHANNEL);
 
-		if (rChannel == null || !rChannel.isOpen())
-		{
-			rChannel =
-				AsynchronousServerSocketChannel.open(
-					getChannelGroup(rContinuation));
-			rCoroutine.set(SERVER_SOCKET_CHANNEL, rChannel)
-					  .annotate(MetaTypes.MANAGED);
+		if (channel == null || !channel.isOpen()) {
+			channel = AsynchronousServerSocketChannel.open(
+				getChannelGroup(continuation));
+			coroutine.set(SERVER_SOCKET_CHANNEL, channel)
+				.annotate(MetaTypes.MANAGED);
 		}
 
-		if (rChannel.getLocalAddress() == null)
-		{
-			rChannel.bind(getSocketAddress(rContinuation));
+		if (channel.getLocalAddress() == null) {
+			channel.bind(getSocketAddress(continuation));
 		}
 
-		return rChannel;
+		return channel;
 	}
 
-	/***************************************
+	/**
 	 * Returns the address of the socket to connect to.
 	 *
-	 * @param  rContinuation The current continuation
-	 *
+	 * @param continuation The current continuation
 	 * @return The socket address
 	 */
-	protected SocketAddress getSocketAddress(Continuation<?> rContinuation)
-	{
-		return fGetSocketAddress.apply(rContinuation);
+	protected SocketAddress getSocketAddress(Continuation<?> continuation) {
+		return getSocketAddress.apply(continuation);
 	}
 
-	/***************************************
+	/**
 	 * Returns the socket address factory of this step.
 	 *
 	 * @return The socket address factory function
 	 */
-	protected Function<Continuation<?>, SocketAddress> getSocketAddressFactory()
-	{
-		return fGetSocketAddress;
+	protected Function<Continuation<?>, SocketAddress> getSocketAddressFactory() {
+		return getSocketAddress;
 	}
 
-	/***************************************
+	/**
 	 * Opens and connects a {@link Channel} to the {@link SocketAddress} of this
 	 * step and then performs the channel operation asynchronously.
 	 *
-	 * @param rSuspension The coroutine suspension to be resumed when the
-	 *                    operation is complete
+	 * @param suspension The coroutine suspension to be resumed when the
+	 *                   operation is complete
 	 */
-	private void acceptAsync(Suspension<Void> rSuspension)
-	{
-		try
-		{
-			AsynchronousServerSocketChannel rChannel =
-				getServerSocketChannel(rSuspension.continuation());
+	private void acceptAsync(Suspension<Void> suspension) {
+		try {
+			AsynchronousServerSocketChannel channel =
+				getServerSocketChannel(suspension.continuation());
 
-			rChannel.accept(
-				null,
-				new AcceptCallback(rRequestHandler, rSuspension));
-		}
-		catch (Exception e)
-		{
-			rSuspension.fail(e);
+			channel.accept(null,
+				new AcceptCallback(requestHandler, suspension));
+		} catch (Exception e) {
+			suspension.fail(e);
 		}
 	}
 
-	//~ Inner Classes ----------------------------------------------------------
-
-	/********************************************************************
+	/**
 	 * A {@link CompletionHandler} implementation that receives the result of an
 	 * asynchronous accept and processes the request with an asynchronous
 	 * coroutine execution.
@@ -260,53 +219,40 @@ public class ServerSocketAccept extends AsynchronousChannelStep<Void, Void>
 	 * @author eso
 	 */
 	protected static class AcceptCallback
-		implements CompletionHandler<AsynchronousSocketChannel, Void>
-	{
-		//~ Instance fields ----------------------------------------------------
+		implements CompletionHandler<AsynchronousSocketChannel, Void> {
 
-		private Coroutine<AsynchronousSocketChannel, ?> rRequestHandler;
-		private final Suspension<Void>				    rSuspension;
+		private final Coroutine<AsynchronousSocketChannel, ?> requestHandler;
 
-		//~ Constructors -------------------------------------------------------
+		private final Suspension<Void> suspension;
 
-		/***************************************
+		/**
 		 * Creates a new instance.
 		 *
-		 * @param rRequestHandler The coroutine to process the request with
-		 * @param rSuspension     The suspension to resume after accepting
+		 * @param requestHandler The coroutine to process the request with
+		 * @param suspension     The suspension to resume after accepting
 		 */
 		public AcceptCallback(
-			Coroutine<AsynchronousSocketChannel, ?> rRequestHandler,
-			Suspension<Void>						rSuspension)
-		{
-			this.rRequestHandler = rRequestHandler;
-			this.rSuspension     = rSuspension;
+			Coroutine<AsynchronousSocketChannel, ?> requestHandler,
+			Suspension<Void> suspension) {
+			this.requestHandler = requestHandler;
+			this.suspension = suspension;
 		}
 
-		//~ Methods ------------------------------------------------------------
+		@Override
+		public void completed(AsynchronousSocketChannel requestChannel,
+			Void ignored) {
+			requestHandler.runAsync(suspension.continuation().scope(),
+				requestChannel);
 
-		/***************************************
+			suspension.resume();
+		}
+
+		/**
 		 * {@inheritDoc}
 		 */
 		@Override
-		public void completed(
-			AsynchronousSocketChannel rRequestChannel,
-			Void					  rIgnored)
-		{
-			rRequestHandler.runAsync(
-				rSuspension.continuation().scope(),
-				rRequestChannel);
-
-			rSuspension.resume();
-		}
-
-		/***************************************
-		 * {@inheritDoc}
-		 */
-		@Override
-		public void failed(Throwable eError, Void rIgnored)
-		{
-			rSuspension.fail(eError);
+		public void failed(Throwable error, Void ignored) {
+			suspension.fail(error);
 		}
 	}
 }

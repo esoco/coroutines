@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 
-
 /********************************************************************
  * A coroutine step that suspends the coroutine execution until the first
  * matching result of several other asynchronously executed coroutines are
@@ -55,11 +54,10 @@ import static java.util.Arrays.asList;
  *
  * @author eso
  */
-public class Select<I, O> extends CoroutineStep<I, O>
-{
+public class Select<I, O> extends CoroutineStep<I, O> {
 	//~ Instance fields --------------------------------------------------------
 
-	private List<Coroutine<? super I, ? extends O>> aCoroutines =
+	private final List<Coroutine<? super I, ? extends O>> aCoroutines =
 		new ArrayList<>();
 
 	private Predicate<Continuation<?>> pSelectCritiera = c -> true;
@@ -71,10 +69,9 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 *
 	 * @param rFromCoroutines The coroutines to select from
 	 */
-	public Select(Collection<Coroutine<? super I, ? extends O>> rFromCoroutines)
-	{
-		if (rFromCoroutines.size() == 0)
-		{
+	public Select(
+		Collection<Coroutine<? super I, ? extends O>> rFromCoroutines) {
+		if (rFromCoroutines.size() == 0) {
 			throw new IllegalArgumentException(
 				"At least one coroutine to select is required");
 		}
@@ -87,8 +84,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 *
 	 * @param rOther The other instance
 	 */
-	private Select(Select<I, O> rOther)
-	{
+	private Select(Select<I, O> rOther) {
 		aCoroutines.addAll(rOther.aCoroutines);
 
 		pSelectCritiera = rOther.pSelectCritiera;
@@ -111,8 +107,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 */
 	@SafeVarargs
 	public static <I, O> Select<I, O> select(
-		Coroutine<? super I, ? extends O>... rFromCoroutines)
-	{
+		Coroutine<? super I, ? extends O>... rFromCoroutines) {
 		return new Select<I, O>(asList(rFromCoroutines));
 	}
 
@@ -127,10 +122,8 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 */
 	@SafeVarargs
 	public static <I, O> Select<I, O> select(
-		CoroutineStep<? super I, ? extends O>... rFromSteps)
-	{
-		return new Select<>(
-			asList(rFromSteps).stream()
+		CoroutineStep<? super I, ? extends O>... rFromSteps) {
+		return new Select<>(asList(rFromSteps).stream()
 			.map(rStep -> new Coroutine<>(rStep))
 			.collect(Collectors.toList()));
 	}
@@ -144,8 +137,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 *
 	 * @return The new instance
 	 */
-	public Select<I, O> or(Coroutine<? super I, ? extends O> rCoroutine)
-	{
+	public Select<I, O> or(Coroutine<? super I, ? extends O> rCoroutine) {
 		Select<I, O> aSelect = new Select<>(this);
 
 		aSelect.aCoroutines.add(rCoroutine);
@@ -162,8 +154,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 *
 	 * @return The new instance
 	 */
-	public Select<I, O> or(CoroutineStep<? super I, ? extends O> rStep)
-	{
+	public Select<I, O> or(CoroutineStep<? super I, ? extends O> rStep) {
 		Select<I, O> aSelect = new Select<>(this);
 
 		aSelect.aCoroutines.add(new Coroutine<>(rStep));
@@ -175,13 +166,10 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<I> fPreviousExecution,
-						 CoroutineStep<O, ?>  rNextStep,
-						 Continuation<?>	  rContinuation)
-	{
-		rContinuation.continueAccept(
-			fPreviousExecution,
-			rInput -> selectAsync(rInput, rNextStep, rContinuation));
+	public void runAsync(CompletableFuture<I> previousExecution,
+		CoroutineStep<O, ?> nextStep, Continuation<?> continuation) {
+		continuation.continueAccept(previousExecution,
+			rInput -> selectAsync(rInput, nextStep, continuation));
 	}
 
 	/***************************************
@@ -194,8 +182,7 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 *
 	 * @return A new step instance
 	 */
-	public Select<I, O> when(Predicate<Continuation<?>> pSelectCriteria)
-	{
+	public Select<I, O> when(Predicate<Continuation<?>> pSelectCriteria) {
 		Select<I, O> aSelect = new Select<>(aCoroutines);
 
 		aSelect.pSelectCritiera = pSelectCriteria;
@@ -207,12 +194,11 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected O execute(I rInput, Continuation<?> rContinuation)
-	{
+	protected O execute(I input, Continuation<?> continuation) {
 		// even if executed blocking the selection must happen asynchronously,
 		// so we just run this step as a new coroutine in the current scope
-		return new Coroutine<>(this).runAsync(rContinuation.scope(), rInput)
-									.getResult();
+		return new Coroutine<>(this).runAsync(continuation.scope(), input)
+			.getResult();
 	}
 
 	/***************************************
@@ -222,23 +208,16 @@ public class Select<I, O> extends CoroutineStep<I, O>
 	 * @param rNextStep     The step to resume after the suspension
 	 * @param rContinuation the current continuation
 	 */
-	void selectAsync(I					 rInput,
-					 CoroutineStep<O, ?> rNextStep,
-					 Continuation<?>	 rContinuation)
-	{
+	void selectAsync(I rInput, CoroutineStep<O, ?> rNextStep,
+		Continuation<?> rContinuation) {
 		Selection<O, O, O> aSelection =
-			Selection.ofSingleValue(
-				this,
-				rNextStep,
-				rContinuation,
+			Selection.ofSingleValue(this, rNextStep, rContinuation,
 				pSelectCritiera);
 
 		rContinuation.suspendTo(aSelection);
 
-		aCoroutines.forEach(
-			rCoroutine ->
-				aSelection.add(
-					rCoroutine.runAsync(rContinuation.scope(), rInput)));
+		aCoroutines.forEach(rCoroutine -> aSelection.add(
+			rCoroutine.runAsync(rContinuation.scope(), rInput)));
 
 		aSelection.seal();
 	}

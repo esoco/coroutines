@@ -2,7 +2,7 @@
 // This file is a part of the 'coroutines' project.
 // Copyright 2019 Elmar Sonnenschein, esoco GmbH, Flensburg, Germany
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
@@ -20,107 +20,98 @@ import de.esoco.coroutine.Continuation;
 import de.esoco.coroutine.Coroutine;
 import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
+import de.esoco.coroutine.Suspension;
 import de.esoco.lib.datatype.Pair;
+import de.esoco.lib.expression.monad.Option;
+import org.obrel.core.RelationType;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-/********************************************************************
+/**
  * A suspending {@link Coroutine} step that performs delayed executions.
  *
  * @author eso
  */
 public class Delay<T> extends CoroutineStep<T, T> {
-    //~ Instance fields --------------------------------------------------------
 
-    private Function<Continuation<?>, Pair<Long, TimeUnit>> fGetDuration;
+	private final Function<Continuation<?>, Pair<Long, TimeUnit>> getDuration;
 
-    //~ Constructors -----------------------------------------------------------
+	/**
+	 * Creates a new instance.
+	 *
+	 * @param getDuration A function that determines the duration to sleep from
+	 *                    the continuation
+	 */
+	public Delay(Function<Continuation<?>, Pair<Long, TimeUnit>> getDuration) {
+		Objects.requireNonNull(getDuration);
+		this.getDuration = getDuration;
+	}
 
-    /***************************************
-     * Creates a new instance.
-     *
-     * @param fGetDuration A function that determines the duration to sleep from
-     *                     the continuation
-     */
-    public Delay(Function<Continuation<?>, Pair<Long, TimeUnit>> fGetDuration) {
-        this.fGetDuration = fGetDuration;
-        Objects.requireNonNull(fGetDuration);
-    }
+	/**
+	 * Suspends the coroutine execution for a duration stored in a certain state
+	 * relation. The lookup of the duration value follows the rules defined by
+	 * {@link Continuation#getState(RelationType, Object)}.
+	 *
+	 * @param getDuration A function that determines the duration to sleep from
+	 *                    the continuation
+	 * @return A new step instance
+	 */
+	public static <T> Delay<T> sleep(
+		Function<Continuation<?>, Pair<Long, TimeUnit>> getDuration) {
+		return new Delay<>(getDuration);
+	}
 
-    //~ Static methods ---------------------------------------------------------
+	/**
+	 * Suspends the coroutine execution for a certain duration in milliseconds.
+	 *
+	 * @param milliseconds The milliseconds to sleep
+	 * @see #sleep(long, TimeUnit)
+	 */
+	public static <T> Delay<T> sleep(long milliseconds) {
+		return sleep(milliseconds, TimeUnit.MILLISECONDS);
+	}
 
-    /***************************************
-     * Suspends the coroutine execution for a duration stored in a certain state
-     * relation. The lookup of the duration value follows the rules defined by
-     * {@link Continuation#getState(RelationType, Object)}.
-     *
-     * @param fGetDuration A function that determines the duration to sleep from
-     *                     the continuation
-     *
-     * @return A new step instance
-     */
-    public static <T> Delay<T> sleep(
-        Function<Continuation<?>, Pair<Long, TimeUnit>> fGetDuration) {
-        return new Delay<>(fGetDuration);
-    }
+	/**
+	 * Suspends the coroutine execution for a certain duration.
+	 *
+	 * @param duration The duration to sleep
+	 * @param timeUnit The time unit of the duration
+	 * @return A new step instance
+	 */
+	public static <T> Delay<T> sleep(long duration, TimeUnit timeUnit) {
+		return new Delay<>(c -> Pair.of(duration, timeUnit));
+	}
 
-    /***************************************
-     * Suspends the coroutine execution for a certain duration in milliseconds.
-     *
-     * @param nMilliseconds The milliseconds to sleep
-     *
-     * @see #sleep(long, TimeUnit)
-     */
-    public static <T> Delay<T> sleep(long nMilliseconds) {
-        return sleep(nMilliseconds, TimeUnit.MILLISECONDS);
-    }
+	@Override
+	public T execute(T input, Continuation<?> continuation) {
+		try {
+			Pair<Long, TimeUnit> duration = getDuration.apply(continuation);
 
-    /***************************************
-     * Suspends the coroutine execution for a certain duration.
-     *
-     * @param nDuration The duration to sleep
-     * @param eUnit     The time unit of the duration
-     *
-     * @return A new step instance
-     */
-    public static <T> Delay<T> sleep(long nDuration, TimeUnit eUnit) {
-        return new Delay<>(c -> Pair.of(nDuration, eUnit));
-    }
+			duration.second().sleep(duration.first());
+		} catch (Exception e) {
+			throw new CoroutineException(e);
+		}
+		return input;
+	}
 
-    //~ Methods ----------------------------------------------------------------
+	@Override
+	public void runAsync(CompletableFuture<T> previousExecution,
+		CoroutineStep<T, ?> nextStep, Continuation<?> continuation) {
+		continuation.continueAccept(previousExecution, v -> {
 
-    /***************************************
-     * {@inheritDoc}
-     */
-    @Override
-    public T execute(T rInput, Continuation<?> rContinuation) {
-        try {
-            Pair<Long, TimeUnit> rDuration = fGetDuration.apply(rContinuation);
+			Suspension<T> suspension = continuation.suspend(this, nextStep);
 
-            rDuration.second().sleep(rDuration.first());
-        } catch (InterruptedException e) {
-            throw new CoroutineException(e);
-        }
-        return rInput;
-    }
+			Pair<Long, TimeUnit> duration = getDuration.apply(continuation);
 
-    /***************************************
-     * {@inheritDoc}
-     */
-    @Override
-    public void runAsync(CompletableFuture<T> fPreviousExecution,
-        CoroutineStep<T, ?> rNextStep, Continuation<?> rContinuation) {
-        rContinuation.continueAccept(fPreviousExecution, v -> {
-            Pair<Long, TimeUnit> rDuration = fGetDuration.apply(rContinuation);
-
-            rContinuation.context()
-                .getScheduler()
-                .schedule(
-                    () -> rContinuation.suspend(this, rNextStep).resume(v),
-                    rDuration.first(), rDuration.second());
-        });
-    }
+			ScheduledFuture<?> delayedExecution = continuation.context()
+				.getScheduler()
+				.schedule(() -> suspension.resume(v), duration.first(),
+					duration.second());
+			suspension.onCancel(Option.of(() -> delayedExecution.cancel(true)));
+		});
+	}
 }

@@ -23,7 +23,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.function.Predicate;
 
-/********************************************************************
+/**
  * A {@link Suspension} subclass that selects the suspension result from one or
  * more of multiple continuations based on certain criteria. If a child
  * continuation fails the selection step will also fail. If a child continuation
@@ -32,246 +32,232 @@ import java.util.function.Predicate;
  * @author eso
  */
 public class Selection<T, V, R> extends Suspension<T> {
-    //~ Instance fields --------------------------------------------------------
 
-    private final CoroutineStep<R, ?> rResumeSelectionStep;
+	private final CoroutineStep<R, ?> resumeSelectionStep;
 
-    private final Predicate<Continuation<?>> pSelect;
+	private final Predicate<Continuation<?>> checkSelect;
 
-    private final Predicate<Continuation<?>> pComplete;
+	private final Predicate<Continuation<?>> checkComplete;
 
-    private final boolean bSingleValue;
+	private final boolean singleValue;
 
-    private boolean bSealed = false;
+	private final List<V> results = new ArrayList<>();
 
-    private boolean bFinished = false;
+	private final List<Continuation<? extends V>> continuations =
+		new ArrayList<>();
 
-    private Runnable fFinishAction = this::resume;
+	private final RunLock stateLock = new RunLock();
 
-    private List<V> aResults = new ArrayList<>();
+	private boolean sealed = false;
 
-    private final List<Continuation<? extends V>> aContinuations =
-        new ArrayList<>();
+	private boolean finished = false;
 
-    private final RunLock aStateLock = new RunLock();
+	private Runnable finishAction = this::resume;
 
-    //~ Constructors -----------------------------------------------------------
+	/**
+	 * Internal constructor to create a new instance. Public creation through
+	 * {@link #ofSingleValue(CoroutineStep, CoroutineStep, Continuation,
+	 * Predicate)} or
+	 * {@link #ofMultipleValues(CoroutineStep, CoroutineStep, Continuation,
+	 * Predicate, Predicate)} for correct generic typing.
+	 *
+	 * @param suspendingStep The step that initiated the suspension
+	 * @param resumeStep     The step to resume the execution with
+	 * @param continuation   The continuation of the execution
+	 * @param checkComplete  The condition for the termination of the selection
+	 * @param checkSelect    The condition for the selection of results
+	 * @param singleValue    TRUE for the selection of a single value, FALSE for
+	 *                       a collection of values
+	 */
+	private Selection(CoroutineStep<?, T> suspendingStep,
+		CoroutineStep<R, ?> resumeStep, Continuation<?> continuation,
+		Predicate<Continuation<?>> checkComplete,
+		Predicate<Continuation<?>> checkSelect, boolean singleValue) {
+		super(suspendingStep, null, continuation);
 
-    /***************************************
-     * Internal constructor to create a new instance. Public creation through
-     * {@link #ofSingleValue(CoroutineStep, CoroutineStep, Continuation)} or
-     * {@link #ofMultipleValues(CoroutineStep, CoroutineStep, Continuation)} for
-     * correct generic typing.
-     *
-     * @param rSuspendingStep The step that initiated the suspension
-     * @param rResumeStep     The step to resume the execution with
-     * @param rContinuation   The continuation of the execution
-     * @param pComplete       The condition for the termination of the selection
-     * @param pSelect         The condition for the selection of results
-     * @param bSingleValue    TRUE for the selection of a single value, FALSE
-     *                        for a collection of values
-     */
-    private Selection(CoroutineStep<?, T> rSuspendingStep,
-        CoroutineStep<R, ?> rResumeStep, Continuation<?> rContinuation,
-        Predicate<Continuation<?>> pComplete,
-        Predicate<Continuation<?>> pSelect, boolean bSingleValue) {
-        super(rSuspendingStep, null, rContinuation);
+		this.resumeSelectionStep = resumeStep;
+		this.checkSelect = checkSelect;
+		this.checkComplete = checkComplete;
+		this.singleValue = singleValue;
+	}
 
-        this.rResumeSelectionStep = rResumeStep;
-        this.pSelect              = pSelect;
-        this.pComplete            = pComplete;
-        this.bSingleValue         = bSingleValue;
-    }
+	/**
+	 * Creates a new instance for the selection of multiple values. If no values
+	 * are selected the result will be an empty collection.
+	 *
+	 * @param suspendingStep The step that initiated the suspension
+	 * @param resumeStep     The step to resume the execution with
+	 * @param rContinuation  The continuation of the execution
+	 * @param checkComplete  The condition for the termination of the selection
+	 * @param checkSelect    The condition for the selection of results
+	 * @return The new instance
+	 */
+	public static <T, V> Selection<T, V, Collection<V>> ofMultipleValues(
+		CoroutineStep<?, T> suspendingStep,
+		CoroutineStep<Collection<V>, ?> resumeStep,
+		Continuation<?> rContinuation, Predicate<Continuation<?>> checkComplete,
+		Predicate<Continuation<?>> checkSelect) {
+		Selection<T, V, Collection<V>> aSelection =
+			new Selection<>(suspendingStep, resumeStep, rContinuation,
+				checkComplete, checkSelect, false);
 
-    //~ Static methods ---------------------------------------------------------
+		return aSelection;
+	}
 
-    /***************************************
-     * Creates a new instance for the selection of multiple values. If no values
-     * are selected the result will be an empty collection.
-     *
-     * @param rSuspendingStep The step that initiated the suspension
-     * @param rResumeStep     The step to resume the execution with
-     * @param rContinuation   The continuation of the execution
-     * @param pComplete       The condition for the termination of the selection
-     * @param pSelect         The condition for the selection of results
-     *
-     * @return The new instance
-     */
-    public static <T, V> Selection<T, V, Collection<V>> ofMultipleValues(
-        CoroutineStep<?, T> rSuspendingStep,
-        CoroutineStep<Collection<V>, ?> rResumeStep,
-        Continuation<?> rContinuation, Predicate<Continuation<?>> pComplete,
-        Predicate<Continuation<?>> pSelect) {
-        Selection<T, V, Collection<V>> aSelection =
-            new Selection<>(rSuspendingStep, rResumeStep, rContinuation,
-                pComplete, pSelect, false);
+	/**
+	 * Creates a new instance for the selection of a single value. If no value
+	 * is selected the result will be NULL.
+	 *
+	 * @param suspendingStep The step that initiated the suspension
+	 * @param resumeStep     The step to resume the execution with
+	 * @param continuation   The continuation of the execution
+	 * @param checkSelect    The condition for the selection of results
+	 * @return The new instance
+	 */
+	public static <T> Selection<T, T, T> ofSingleValue(
+		CoroutineStep<?, T> suspendingStep, CoroutineStep<T, ?> resumeStep,
+		Continuation<?> continuation, Predicate<Continuation<?>> checkSelect) {
+		return new Selection<>(suspendingStep, resumeStep, continuation,
+			c -> true, checkSelect, true);
+	}
 
-        return aSelection;
-    }
+	/**
+	 * Adds a continuation to this group.
+	 *
+	 * @param continuation The continuation
+	 */
+	public void add(Continuation<? extends V> continuation) {
+		stateLock.runLocked(() -> {
+			if (sealed) {
+				throw new IllegalStateException("Selection is sealed");
+			}
+			// first add to make sure remove after an immediate return by
+			// the following callbacks is applied
+			continuations.add(continuation);
+		});
 
-    /***************************************
-     * Creates a new instance for the selection of a single value. If no value
-     * is selected the result will be NULL.
-     *
-     * @param rSuspendingStep The step that initiated the suspension
-     * @param rResumeStep     The step to resume the execution with
-     * @param rContinuation   The continuation of the execution
-     * @param pSelect         The condition for the selection of results
-     *
-     * @return The new instance
-     */
-    public static <T> Selection<T, T, T> ofSingleValue(
-        CoroutineStep<?, T> rSuspendingStep, CoroutineStep<T, ?> rResumeStep,
-        Continuation<?> rContinuation, Predicate<Continuation<?>> pSelect) {
-        return new Selection<>(rSuspendingStep, rResumeStep, rContinuation,
-            c -> true, pSelect, true);
-    }
+		continuation.onFinish(this::continuationFinished)
+			.onCancel(this::continuationCancelled)
+			.onError(this::continuationFailed);
 
-    //~ Methods ----------------------------------------------------------------
+		if (finished) {
+			continuation.cancel();
+		}
+	}
 
-    /***************************************
-     * Adds a continuation to this group.
-     *
-     * @param rContinuation The continuation
-     */
-    public void add(Continuation<? extends V> rContinuation) {
-        aStateLock.runLocked(() -> {
-            if (bSealed) {
-                throw new IllegalStateException("Selection is sealed");
-            }
-            // first add to make sure remove after an immediate return by
-            // the following callbacks is applied
-            aContinuations.add(rContinuation);
-        });
+	@Override
+	public void cancel() {
+		stateLock.runLocked(() -> {
+			finished = true;
+			finishAction = this::cancel;
 
-        rContinuation.onFinish(this::continuationFinished)
-            .onCancel(this::continuationCancelled)
-            .onError(this::continuationFailed);
+			checkComplete();
+		});
+	}
 
-        if (bFinished) {
-            rContinuation.cancel();
-        }
-    }
+	/**
+	 * Seals this instance so that no more coroutines can be added with
+	 * {@link #add(Continuation)}. Sealing is necessary to allow the adding of
+	 * further coroutines even if previously added coroutines have already
+	 * finished execution.
+	 */
+	public void seal() {
+		stateLock.runLocked(() -> {
+			sealed = true;
+			checkComplete();
+		});
+	}
 
-    /***************************************
-     * {@inheritDoc}
-     */
-    @Override
-    public void cancel() {
-        aStateLock.runLocked(() -> {
-            bFinished     = true;
-            fFinishAction = this::cancel;
+	@Override
+	public String toString() {
+		return String.format("%s[%s -> %s]", getClass().getSimpleName(),
+			suspendingStep(), resumeSelectionStep);
+	}
 
-            checkComplete();
-        });
-    }
+	/**
+	 * Notified when a continuation is cancelled. Cancelled continuations will
+	 * only be removed but the selection will continue.
+	 *
+	 * @param continuation The finished continuation
+	 */
+	@SuppressWarnings("unchecked")
+	void continuationCancelled(Continuation<? extends V> continuation) {
+		stateLock.runLocked(() -> {
+			continuations.remove(continuation);
+			checkComplete();
+		});
+	}
 
-    /***************************************
-     * Seals this instance so that no more coroutines can be added with
-     * {@link #add(Continuation)}. Sealing is necessary to allow the adding of
-     * further coroutines even if previously added coroutines have already
-     * finished execution.
-     */
-    public void seal() {
-        aStateLock.runLocked(() -> {
-            bSealed = true;
-            checkComplete();
-        });
-    }
+	/**
+	 * Notified when the execution of a continuation failed. In that case the
+	 * full selection will fail too.
+	 *
+	 * @param continuation The finished continuation
+	 */
+	@SuppressWarnings("unchecked")
+	void continuationFailed(Continuation<? extends V> continuation) {
+		stateLock.runLocked(() -> {
+			continuations.remove(continuation);
+			finished = true;
+			finishAction = () -> fail(continuation.getError());
 
-    /***************************************
-     * {@inheritDoc}
-     */
-    @Override
-    public String toString() {
-        return String.format("%s[%s -> %s]", getClass().getSimpleName(),
-            suspendingStep(), rResumeSelectionStep);
-    }
+			checkComplete();
+		});
+	}
 
-    /***************************************
-     * Notified when a continuation is cancelled. Cancelled continuations will
-     * only be removed but the selection will continue.
-     *
-     * @param rContinuation The finished continuation
-     */
-    @SuppressWarnings("unchecked")
-    void continuationCancelled(Continuation<? extends V> rContinuation) {
-        aStateLock.runLocked(() -> {
-            aContinuations.remove(rContinuation);
-            checkComplete();
-        });
-    }
+	/**
+	 * Notified when a continuation is finished.
+	 *
+	 * @param continuation The finished continuation
+	 */
+	@SuppressWarnings("unchecked")
+	void continuationFinished(Continuation<? extends V> continuation) {
+		stateLock.runLocked(() -> {
+			continuations.remove(continuation);
 
-    /***************************************
-     * Notified when the execution of a continuation failed. In that case the
-     * full selection will fail too.
-     *
-     * @param rContinuation The finished continuation
-     */
-    @SuppressWarnings("unchecked")
-    void continuationFailed(Continuation<? extends V> rContinuation) {
-        aStateLock.runLocked(() -> {
-            aContinuations.remove(rContinuation);
-            bFinished     = true;
-            fFinishAction = () -> fail(rContinuation.getError());
+			if (!finished) {
+				if (checkSelect.test(continuation)) {
+					results.add(continuation.getResult());
+				}
+				finished = checkComplete.test(continuation);
+			}
+			checkComplete();
+		});
+	}
 
-            checkComplete();
-        });
-    }
+	/**
+	 * Overridden to resume the selection result step instead.
+	 *
+	 * @see Continuation#resumeAsync(CoroutineStep, Object)
+	 */
+	@Override
+	void resumeAsync() {
+		// type safety is ensured by the factory methods
+		@SuppressWarnings("unchecked")
+		R result = (R) (singleValue ?
+			(results.size() >= 1 ? results.get(0) : null) :
+			results);
 
-    /***************************************
-     * Notified when a continuation is finished.
-     *
-     * @param rContinuation The finished continuation
-     */
-    @SuppressWarnings("unchecked")
-    void continuationFinished(Continuation<? extends V> rContinuation) {
-        aStateLock.runLocked(() -> {
-            aContinuations.remove(rContinuation);
+		continuation().resumeAsync(resumeSelectionStep, result);
+	}
 
-            if (!bFinished) {
-                if (pSelect.test(rContinuation)) {
-                    aResults.add(rContinuation.getResult());
-                }
-                bFinished = pComplete.test(rContinuation);
-            }
-            checkComplete();
-        });
-    }
+	/**
+	 * Resumes this selection if it is sealed and contains no more
+	 * continuations.
+	 */
+	private void checkComplete() {
+		if (finished && !continuations.isEmpty()) {
+			// cancel all remaining continuations if already finished; needs to
+			// be done with a copied list because cancel may modify the list
+			new ArrayList<>(continuations).forEach(Continuation::cancel);
+		}
+		// only finish if all child continuations have finished to race
+		// conditions with subsequent step executions
+		if (sealed && continuations.isEmpty()) {
+			finished = true;
 
-    /***************************************
-     * Overridden to resume the selection result step instead.
-     *
-     * @see Continuation#resumeAsync(CoroutineStep, Object)
-     */
-    @Override
-    void resumeAsync() {
-        // type safety is ensured by the factory methods
-        @SuppressWarnings("unchecked")
-        R rResult =
-            (R) (bSingleValue ? (aResults.size() >= 1 ? aResults.get(0) : null)
-                : aResults);
-
-        continuation().resumeAsync(rResumeSelectionStep, rResult);
-    }
-
-    /***************************************
-     * Resumes this selection if it is sealed and contains no more
-     * continuations.
-     */
-    private void checkComplete() {
-        if (bFinished && !aContinuations.isEmpty()) {
-            // cancel all remaining continuations if already finished; needs to
-            // be done with a copied list because cancel may modify the list
-            new ArrayList<>(aContinuations).forEach(Continuation::cancel);
-        }
-        // only finish if all child continuations have finished to race
-        // conditions with subsequent step executions
-        if (bSealed && aContinuations.isEmpty()) {
-            bFinished = true;
-
-            // will either resume, cancel, or fail this suspension
-            fFinishAction.run();
-        }
-    }
+			// will either resume, cancel, or fail this suspension
+			finishAction.run();
+		}
+	}
 }

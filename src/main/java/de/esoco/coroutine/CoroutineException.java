@@ -18,45 +18,42 @@ package de.esoco.coroutine;
 
 import java.util.concurrent.CompletionException;
 
-/********************************************************************
+/**
  * The base class of unchecked exceptions that may be thrown by
  * {@link Coroutine} executions.
  *
  * @author eso
  */
 public class CoroutineException extends CompletionException {
-    //~ Static fields/initializers ---------------------------------------------
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    //~ Constructors -----------------------------------------------------------
+	/**
+	 * Creates a new instance.
+	 *
+	 * @param cause The causing exception
+	 */
+	public CoroutineException(Throwable cause) {
+		super(cause);
+	}
 
-    /***************************************
-     * Creates a new instance.
-     *
-     * @param eCause The causing exception
-     */
-    public CoroutineException(Throwable eCause) {
-        super(eCause);
-    }
+	/**
+	 * Creates a new instance with a formatted message.
+	 *
+	 * @param messageFormat The error message format string
+	 * @param args          The format arguments
+	 */
+	public CoroutineException(String messageFormat, Object... args) {
+		super(String.format(messageFormat, args));
+	}
 
-    /***************************************
-     * Creates a new instance with a formatted message.
-     *
-     * @param sMessageFormat The error message format string
-     * @param rArgs          The format arguments
-     */
-    public CoroutineException(String sMessageFormat, Object... rArgs) {
-        super(String.format(sMessageFormat, rArgs));
-    }
-
-    /***************************************
-     * Creates a new instance.
-     *
-     * @param sMessage The error message
-     * @param eCause   The causing exception
-     */
-    public CoroutineException(String sMessage, Throwable eCause) {
-        super(sMessage, eCause);
-    }
+	/**
+	 * Creates a new instance.
+	 *
+	 * @param message The error message
+	 * @param cause   The causing exception
+	 */
+	public CoroutineException(String message, Throwable cause) {
+		super(message, cause);
+	}
 }

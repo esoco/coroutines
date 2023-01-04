@@ -26,7 +26,6 @@ import java.util.function.Predicate;
 
 import static de.esoco.coroutine.step.CodeExecution.consume;
 
-
 /********************************************************************
  * A {@link Coroutine} step that loops over another step (which may be a
  * subroutine) as long as a predicate yields TRUE for the input value and/or the
@@ -40,12 +39,12 @@ import static de.esoco.coroutine.step.CodeExecution.consume;
  *
  * @author eso
  */
-public class Loop<T> extends CoroutineStep<T, T>
-{
+public class Loop<T> extends CoroutineStep<T, T> {
 	//~ Instance fields --------------------------------------------------------
 
 	private final BiPredicate<? super T, Continuation<?>> pCondition;
-	private final CoroutineStep<T, T>					  rLoopedStep;
+
+	private final CoroutineStep<T, T> rLoopedStep;
 
 	//~ Constructors -----------------------------------------------------------
 
@@ -55,11 +54,9 @@ public class Loop<T> extends CoroutineStep<T, T>
 	 * @param fCondition  The condition to check for TRUE to continue looping
 	 * @param rLoopedStep The step to execute in the loop
 	 */
-	public Loop(
-		BiPredicate<? super T, Continuation<?>> fCondition,
-		CoroutineStep<T, T>						rLoopedStep)
-	{
-		this.pCondition  = fCondition;
+	public Loop(BiPredicate<? super T, Continuation<?>> fCondition,
+		CoroutineStep<T, T> rLoopedStep) {
+		this.pCondition = fCondition;
 		this.rLoopedStep = rLoopedStep;
 	}
 
@@ -78,8 +75,7 @@ public class Loop<T> extends CoroutineStep<T, T>
 	 */
 	public static <T> Loop<T> loopWhile(
 		BiPredicate<? super T, Continuation<?>> pCondition,
-		CoroutineStep<T, T>						rLoopedStep)
-	{
+		CoroutineStep<T, T> rLoopedStep) {
 		return new Loop<>(pCondition, rLoopedStep);
 	}
 
@@ -97,10 +93,8 @@ public class Loop<T> extends CoroutineStep<T, T>
 	 *
 	 * @return A new step instance
 	 */
-	public static <T> Loop<T> loopWhile(
-		Predicate<T>		pCondition,
-		CoroutineStep<T, T> rLoopedStep)
-	{
+	public static <T> Loop<T> loopWhile(Predicate<T> pCondition,
+		CoroutineStep<T, T> rLoopedStep) {
 		return loopWhile((i, c) -> pCondition.test(i), rLoopedStep);
 	}
 
@@ -110,27 +104,22 @@ public class Loop<T> extends CoroutineStep<T, T>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<T> fPreviousExecution,
-						 CoroutineStep<T, ?>  rNextStep,
-						 Continuation<?>	  rContinuation)
-	{
-		rContinuation.continueAccept(
-			fPreviousExecution,
-			i -> loopAsync(i, rNextStep, rContinuation));
+	public void runAsync(CompletableFuture<T> previousExecution,
+		CoroutineStep<T, ?> nextStep, Continuation<?> continuation) {
+		continuation.continueAccept(previousExecution,
+			i -> loopAsync(i, nextStep, continuation));
 	}
 
 	/***************************************
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected T execute(T rValue, Continuation<?> rContinuation)
-	{
-		while (pCondition.test(rValue, rContinuation))
-		{
-			rValue = rLoopedStep.runBlocking(rValue, rContinuation);
+	protected T execute(T input, Continuation<?> continuation) {
+		while (pCondition.test(input, continuation)) {
+			input = rLoopedStep.runBlocking(input, continuation);
 		}
 
-		return rValue;
+		return input;
 	}
 
 	/***************************************
@@ -142,22 +131,16 @@ public class Loop<T> extends CoroutineStep<T, T>
 	 *                      FALSE
 	 * @param rContinuation The continuation of the execution
 	 */
-	private void loopAsync(T				   rInput,
-						   CoroutineStep<T, ?> rNextStep,
-						   Continuation<?>	   rContinuation)
-	{
-		if (pCondition.test(rInput, rContinuation))
-		{
+	private void loopAsync(T rInput, CoroutineStep<T, ?> rNextStep,
+		Continuation<?> rContinuation) {
+		if (pCondition.test(rInput, rContinuation)) {
 			CompletableFuture<T> fLoopIteration =
 				CompletableFuture.supplyAsync(() -> rInput, rContinuation);
 
-			rLoopedStep.runAsync(
-				fLoopIteration,
+			rLoopedStep.runAsync(fLoopIteration,
 				consume(i -> loopAsync(i, rNextStep, rContinuation)),
 				rContinuation);
-		}
-		else
-		{
+		} else {
 			rContinuation.suspend(this, rNextStep).resume(rInput);
 		}
 	}

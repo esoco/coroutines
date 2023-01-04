@@ -24,7 +24,6 @@ import de.esoco.coroutine.CoroutineStep;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
-
 /********************************************************************
  * A coroutine step that receives a value from a channel. If the channel is
  * empty at the time of this step's invocation the coroutine execution will be
@@ -34,8 +33,7 @@ import java.util.function.Function;
  *
  * @author eso
  */
-public class ChannelReceive<T> extends ChannelStep<Void, T>
-{
+public class ChannelReceive<T> extends ChannelStep<Void, T> {
 	//~ Constructors -----------------------------------------------------------
 
 	/***************************************
@@ -44,8 +42,8 @@ public class ChannelReceive<T> extends ChannelStep<Void, T>
 	 *
 	 * @param fGetChannelId The function that will return the channel ID
 	 */
-	public ChannelReceive(Function<Continuation<?>, ChannelId<T>> fGetChannelId)
-	{
+	public ChannelReceive(
+		Function<Continuation<?>, ChannelId<T>> fGetChannelId) {
 		super(fGetChannelId);
 	}
 
@@ -58,8 +56,7 @@ public class ChannelReceive<T> extends ChannelStep<Void, T>
 	 *
 	 * @return A new instance of this class
 	 */
-	public static <T> ChannelReceive<T> receive(ChannelId<T> rId)
-	{
+	public static <T> ChannelReceive<T> receive(ChannelId<T> rId) {
 		return new ChannelReceive<>(c -> rId);
 	}
 
@@ -72,8 +69,7 @@ public class ChannelReceive<T> extends ChannelStep<Void, T>
 	 * @return A new step instance
 	 */
 	public static <T> ChannelReceive<T> receive(
-		Function<Continuation<?>, ChannelId<T>> fGetChannelId)
-	{
+		Function<Continuation<?>, ChannelId<T>> fGetChannelId) {
 		return new ChannelReceive<>(fGetChannelId);
 	}
 
@@ -83,23 +79,18 @@ public class ChannelReceive<T> extends ChannelStep<Void, T>
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void runAsync(CompletableFuture<Void> fPreviousExecution,
-						 CoroutineStep<T, ?>	 rNextStep,
-						 Continuation<?>		 rContinuation)
-	{
-		rContinuation.continueAccept(
-			fPreviousExecution,
-			nothing ->
-				getChannel(rContinuation).receiveSuspending(
-					rContinuation.suspend(this, rNextStep)));
+	public void runAsync(CompletableFuture<Void> previousExecution,
+		CoroutineStep<T, ?> nextStep, Continuation<?> continuation) {
+		continuation.continueAccept(previousExecution,
+			nothing -> getChannel(continuation).receiveSuspending(
+				continuation.suspend(this, nextStep)));
 	}
 
 	/***************************************
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected T execute(Void rIgnored, Continuation<?> rContinuation)
-	{
-		return getChannel(rContinuation).receiveBlocking();
+	protected T execute(Void input, Continuation<?> continuation) {
+		return getChannel(continuation).receiveBlocking();
 	}
 }

@@ -21,28 +21,24 @@ import de.esoco.coroutine.CoroutineContext;
 import de.esoco.coroutine.CoroutineException;
 import de.esoco.coroutine.CoroutineStep;
 import de.esoco.coroutine.Suspension;
+import org.obrel.core.RelationType;
+import org.obrel.core.RelationTypes;
 
 import java.io.IOException;
-
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousChannel;
 import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.CompletionHandler;
-
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
-import org.obrel.core.RelationType;
-import org.obrel.core.RelationTypes;
-
 import static org.obrel.core.RelationTypes.newType;
 
-
-/********************************************************************
+/**
  * The base class for coroutine steps that perform communication through
- * instances of {@link AsynchronousChannel}. It contains the inner class {@link
- * ChannelCallback} that implements most of the {@link CompletionHandler}
+ * instances of {@link AsynchronousChannel}. It contains the inner class
+ * {@link ChannelCallback} that implements most of the {@link CompletionHandler}
  * interface needed for asynchonous channel communication. The actual channel
  * operation must be provided to it as an implementation of the function
  * interface {@link ChannelOperation}.
@@ -57,13 +53,8 @@ import static org.obrel.core.RelationTypes.newType;
  *
  * @author eso
  */
-public abstract class AsynchronousChannelStep<I, O> extends CoroutineStep<I, O>
-{
-	//~ Static fields/initializers ---------------------------------------------
-
-	/** Internal signal for the first operation after a connect. */
-	static final int FIRST_OPERATION = -2;
-
+public abstract class AsynchronousChannelStep<I, O>
+	extends CoroutineStep<I, O> {
 	/**
 	 * State: the {@link AsynchronousChannelGroup} to associate any new
 	 * asynchronous channels with.
@@ -71,92 +62,74 @@ public abstract class AsynchronousChannelStep<I, O> extends CoroutineStep<I, O>
 	public static final RelationType<AsynchronousChannelGroup> CHANNEL_GROUP =
 		newType();
 
-	static
-	{
+	/**
+	 * Internal signal for the first operation after a connection.
+	 */
+	static final int FIRST_OPERATION = -2;
+
+	static {
 		RelationTypes.init(AsynchronousChannelStep.class);
 	}
 
-	//~ Methods ----------------------------------------------------------------
-
-	/***************************************
+	/**
 	 * Returns the {@link AsynchronousChannelGroup} for asynchronous channel
 	 * operations in the current scope. If no such group exists a new one will
-	 * be created with the {@link ExecutorService} of the {@link
-	 * CoroutineContext} and stored as {@link #CHANNEL_GROUP} in the current
-	 * scope.
+	 * be created with the {@link ExecutorService} of the
+	 * {@link CoroutineContext} and stored as {@link #CHANNEL_GROUP} in the
+	 * current scope.
 	 *
-	 * @param  rContinuation The channel group
-	 *
+	 * @param continuation The channel group
 	 * @return The channel group
 	 */
 	protected AsynchronousChannelGroup getChannelGroup(
-		Continuation<?> rContinuation)
-	{
-		AsynchronousChannelGroup rChannelGroup =
-			rContinuation.getState(CHANNEL_GROUP);
+		Continuation<?> continuation) {
+		AsynchronousChannelGroup channelGroup =
+			continuation.getState(CHANNEL_GROUP);
 
-		if (rChannelGroup == null)
-		{
-			Executor rContextExecutor = rContinuation.context().getExecutor();
+		if (channelGroup == null) {
+			Executor rContextExecutor = continuation.context().getExecutor();
 
-			if (rContextExecutor instanceof ExecutorService)
-			{
-				try
-				{
-					rChannelGroup =
-						AsynchronousChannelGroup.withThreadPool(
-							(ExecutorService) rContextExecutor);
-				}
-				catch (IOException e)
-				{
+			if (rContextExecutor instanceof ExecutorService) {
+				try {
+					channelGroup = AsynchronousChannelGroup.withThreadPool(
+						(ExecutorService) rContextExecutor);
+				} catch (IOException e) {
 					throw new CoroutineException(e);
 				}
 
-				rContinuation.scope().set(CHANNEL_GROUP, rChannelGroup);
+				continuation.scope().set(CHANNEL_GROUP, channelGroup);
 			}
 		}
 
-		return rChannelGroup;
+		return channelGroup;
 	}
 
-	//~ Inner Interfaces -------------------------------------------------------
-
-	/********************************************************************
+	/**
 	 * A functional interface used as argument to {@link ChannelCallback}.
 	 *
 	 * @author eso
 	 */
 	@FunctionalInterface
-	protected interface ChannelOperation<C extends AsynchronousChannel>
-	{
-		//~ Methods ------------------------------------------------------------
-
-		/***************************************
+	protected interface ChannelOperation<C extends AsynchronousChannel> {
+		/**
 		 * Performs an asnychronous channel operation if necessary or returns
 		 * FALSE.
 		 *
-		 * @param  nBytesProcessed The number of bytes that have been processed
-		 *                         by a previous invocation
-		 * @param  rChannel        The channel to perform the operation on
-		 * @param  rData           The byte buffer for the operation data
-		 * @param  rCallback       The callback to be invoked (recursively) upon
-		 *                         completion of the operation
-		 *
+		 * @param bytesProcessed The number of bytes that have been processed by
+		 *                       a previous invocation
+		 * @param channel        The channel to perform the operation on
+		 * @param data           The byte buffer for the operation data
+		 * @param callback       The callback to be invoked (recursively) upon
+		 *                       completion of the operation
 		 * @return FALSE if a recursive asynchronous execution has been started,
-		 *         TRUE if the operation is complete
-		 *
+		 * TRUE if the operation is complete
 		 * @throws Exception Any kind of exception may be thrown
 		 */
-		public boolean execute(int						   nBytesProcessed,
-							   C						   rChannel,
-							   ByteBuffer				   rData,
-							   ChannelCallback<Integer, C> rCallback)
-			throws Exception;
+		boolean execute(int bytesProcessed, C channel, ByteBuffer data,
+			ChannelCallback<Integer, C> callback) throws Exception;
 	}
 
-	//~ Inner Classes ----------------------------------------------------------
-
-	/********************************************************************
+	/**
 	 * A {@link CompletionHandler} implementation that performs an asynchronous
 	 * channel operation and resumes a coroutine step afterwards
 	 * (asynchronously).
@@ -164,73 +137,51 @@ public abstract class AsynchronousChannelStep<I, O> extends CoroutineStep<I, O>
 	 * @author eso
 	 */
 	protected static class ChannelCallback<V, C extends AsynchronousChannel>
-		implements CompletionHandler<V, ByteBuffer>
-	{
-		//~ Instance fields ----------------------------------------------------
+		implements CompletionHandler<V, ByteBuffer> {
+		private final C channel;
 
-		private final C						 rChannel;
-		private final Suspension<ByteBuffer> rSuspension;
-		private ChannelOperation<C>			 fOperation;
+		private final Suspension<ByteBuffer> suspension;
 
-		//~ Constructors -------------------------------------------------------
+		private final ChannelOperation<C> operation;
 
-		/***************************************
+		/**
 		 * Creates a new instance.
 		 *
-		 * @param rChannel    The channel to operate on
-		 * @param rSuspension The suspension to be resumed when the operation is
-		 *                    completed
-		 * @param fOperation  The asynchronous channel operation to perform
+		 * @param channel    The channel to operate on
+		 * @param suspension The suspension to be resumed when the operation is
+		 *                   completed
+		 * @param operation  The asynchronous channel operation to perform
 		 */
-		protected ChannelCallback(C						 rChannel,
-								  Suspension<ByteBuffer> rSuspension,
-								  ChannelOperation<C>    fOperation)
-		{
-			this.rChannel    = rChannel;
-			this.rSuspension = rSuspension;
-			this.fOperation  = fOperation;
+		protected ChannelCallback(C channel, Suspension<ByteBuffer> suspension,
+			ChannelOperation<C> operation) {
+			this.channel = channel;
+			this.suspension = suspension;
+			this.operation = operation;
 		}
 
-		//~ Methods ------------------------------------------------------------
-
-		/***************************************
-		 * {@inheritDoc}
-		 */
 		@Override
 		@SuppressWarnings("unchecked")
-		public void completed(V rResult, ByteBuffer rData)
-		{
+		public void completed(V result, ByteBuffer data) {
 			// first invocation from connect is Void, then read/write integers
-			int nProcessed =
-				rResult instanceof Integer ? ((Integer) rResult).intValue()
-										   : FIRST_OPERATION;
+			int processed = result instanceof Integer ?
+				((Integer) result).intValue() :
+				FIRST_OPERATION;
 
-			try
-			{
+			try {
 				// required to force THIS to integer to have only one implementation
 				// as the Java NIO API declares the connect stage callback as Void
-				if (fOperation.execute(
-						nProcessed,
-						rChannel,
-						rData,
-						(ChannelCallback<Integer, C>) this))
-				{
-					rSuspension.resume(rData);
+				if (operation.execute(processed, channel, data,
+					(ChannelCallback<Integer, C>) this)) {
+					suspension.resume(data);
 				}
-			}
-			catch (Exception e)
-			{
-				rSuspension.fail(e);
+			} catch (Exception e) {
+				suspension.fail(e);
 			}
 		}
 
-		/***************************************
-		 * {@inheritDoc}
-		 */
 		@Override
-		public void failed(Throwable eError, ByteBuffer rData)
-		{
-			rSuspension.fail(eError);
+		public void failed(Throwable error, ByteBuffer data) {
+			suspension.fail(error);
 		}
 	}
 }

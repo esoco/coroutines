@@ -18,55 +18,48 @@ package de.esoco.coroutine;
 
 import de.esoco.lib.event.GenericEvent;
 
-/********************************************************************
+/**
  * The event object for coroutine events.
  *
  * @author eso
  */
 public class CoroutineEvent extends GenericEvent<Continuation<?>> {
-    //~ Enums ------------------------------------------------------------------
 
-    /********************************************************************
-     * The available event types.
-     */
-    public enum EventType {
-        STARTED, FINISHED
-    }
+	/**
+	 * The available event types.
+	 */
+	public enum EventType {
+		STARTED, FINISHED
+	}
 
-    //~ Instance fields --------------------------------------------------------
+	private final EventType type;
 
-    private final EventType eType;
+	/**
+	 * Creates a new instance.
+	 *
+	 * @param continuation The continuation of the coroutine execution
+	 * @param type         The event type
+	 */
+	public CoroutineEvent(Continuation<?> continuation, EventType type) {
+		super(continuation);
 
-    //~ Constructors -----------------------------------------------------------
+		this.type = type;
+	}
 
-    /***************************************
-     * Creates a new instance.
-     *
-     * @param rContinuation The continuation of the coroutine execution
-     * @param eType         The event type
-     */
-    public CoroutineEvent(Continuation<?> rContinuation, EventType eType) {
-        super(rContinuation);
+	/**
+	 * Returns the event type.
+	 *
+	 * @return The event type
+	 */
+	public EventType getType() {
+		return type;
+	}
 
-        this.eType = eType;
-    }
-
-    //~ Methods ----------------------------------------------------------------
-
-    /***************************************
-     * Returns the event type.
-     *
-     * @return The event type
-     */
-    public EventType getType() {
-        return eType;
-    }
-
-    /***************************************
-     * {@inheritDoc}
-     */
-    @Override
-    protected String paramString() {
-        return eType.name();
-    }
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	protected String paramString() {
+		return type.name();
+	}
 }
