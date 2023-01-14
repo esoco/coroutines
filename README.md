@@ -1,62 +1,37 @@
 # Java Coroutines
 
-[![Build Status](https://www.travis-ci.org/esoco/coroutines.svg?branch=master)](https://www.travis-ci.org/esoco/coroutines)&nbsp;&nbsp;&nbsp;
-[![Download](https://api.bintray.com/packages/esoco/sdack/coroutines/images/download.svg)](https://bintray.com/esoco/sdack/coroutines/_latestVersion)&nbsp;&nbsp;&nbsp;
-[![Gitter chat](https://badges.gitter.im/esoco-coroutines/gitter.png)](https://gitter.im/esoco-coroutines/community)
+[![Build Status](https://www.travis-ci.org/esoco/coroutines.svg?branch=master)](https://www.travis-ci.org/esoco/coroutines)
 
-This project contains a pure Java implementation of coroutines. I has a single dependency to the [ObjectRelations project](https://github.com/esoco/objectrelations). 
+This project contains a pure Java implementation of coroutines. I has a single dependency to the [ObjectRelations project](https://github.com/esoco/objectrelations).
 
-It can be build locally after cloning by starting a gradle build with `gradlew build`. 
+It can be build locally after cloning by starting a gradle build with `gradlew build`.
 
 ## Usage
-To include coroutines into a project, add the dependency to your project. 
+
+To include coroutines into a project, add the dependency to your project.
 
 ### Gradle
 
 ```gradle
 dependencies {
-	compile 'de.esoco:coroutines:0.9.1'
+    implementation "de.esoco:coroutines:${esocoCoroutinesVersion}"
 }
 ```
 
 ### Maven
-When using Maven it is necessary to define the JCenter repository. Furthermore, because of an incompatibility with Gradle wildcard versions it is currently necessary to explicitly declare the transitive dependencies of the project in Maven. This will be fixed in a future release. The pom.xml currently needs to contain the following entries:
 
 ```xml
-<repositories>
-    <repository>
-        <id>jcenter</id>
-        <url>https://jcenter.bintray.com/</url>
-    </repository>
-</repositories>
-
-<properties>
-    <esoco.common.version>1.2.0</esoco.common.version>
-    <esoco.objectrelations.version>1.3.0</esoco.objectrelations.version>
-    <esoco.coroutines.version>0.9.1</esoco.coroutines.version>
-</properties>
-
 <dependencies>
     <dependency>
         <groupId>de.esoco</groupId>
         <artifactId>coroutines</artifactId>
         <version>${esoco.coroutines.version}</version>
     </dependency>
-    <dependency>
-        <groupId>org.obrel</groupId>
-        <artifactId>objectrelations</artifactId>
-        <version>${esoco.objectrelations.version}</version>
-    </dependency>
-    <dependency>
-        <groupId>de.esoco</groupId>
-        <artifactId>esoco-common</artifactId>
-        <version>${esoco.common.version}</version>
-    </dependency>
 </dependencies>
 
 ```
 
-The following gives only a short overview of how to use this project. More detailed information can be found on our [documentation site](https://esoco.gitbook.io/sdack/coroutines/introduction) and in the [generated javadoc](https://esoco.github.io/coroutines/javadoc/).
+The following gives only a short overview of how to use this project. More detailed information can be found on our [documentation site](https://esoco.gitbook.io/sdack/coroutines/introduction) and in the [generated Javadoc](https://esoco.github.io/coroutines/javadoc/).
 
 ## Declaring Coroutines
 
@@ -97,14 +72,13 @@ Any code that would follow after the scope launch block will only run after all 
 
 Each start of a coroutine produces a [Continuation](https://esoco.github.io/coroutines/javadoc/de/esoco/coroutine/Continuation.html) object that can be used to observe and if necessary cancel the asynchronous coroutine execution. When the coroutine has finished execution it provides access to the produced result (if such exists).
 
-### ScopeFuture 
+### ScopeFuture
 
 If a coroutine scope needs to produce a value it can be started by means of the `produce` method instead of `launch`. That method returns immediately with an instance of `java.util.concurrent.Future` which can then be used to monitor the scope execution and to query the result or error state after completion. This method can also be used if handling a scope through a future is preferred over a launch block. In any case the execution of the asynchronous code is contained and can be supervised by the application. A simple example:
 
 ```java
 Future<String> futureResult =
-	CoroutineScope.produce(scope -> getScopeResult(scope), 
-	                       scope -> someCoroutine.runAsync(scope, "input"));
+    CoroutineScope.produce(scope -> getScopeResult(scope), scope -> someCoroutine.runAsync(scope, "input"));
 
 String result = futureResult.get();
 ```

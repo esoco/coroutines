@@ -21,8 +21,6 @@ sourceCompatibility = 1.8
 dependencies {
     api "org.obrel:objectrelations:$obrelVersion"
 
-    //implementation "org.reactivestreams:reactive-streams:$reactiveStreamsVersion"
-
     testImplementation platform("org.junit:junit-bom:$junitVersion")
     testImplementation 'org.junit.jupiter:junit-jupiter'
 }

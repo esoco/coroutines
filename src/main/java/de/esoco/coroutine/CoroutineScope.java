@@ -94,7 +94,7 @@ public class CoroutineScope extends CoroutineEnvironment {
 	 * Launches a new scope for the execution of coroutine in a specific
 	 * context. This method will block the invoking thread until all coroutines
 	 * launched by the argument builder have terminated, either successfully, by
-	 * cancelation, or with errors.
+	 * cancellation, or with errors.
 	 *
 	 * <p>
 	 * If one or more of the coroutines or the scope code throw an exception
