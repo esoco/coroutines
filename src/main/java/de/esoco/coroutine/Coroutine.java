@@ -62,10 +62,10 @@ import static org.obrel.type.StandardTypes.NAME;
  * From the outside a coroutine is a function that receives an input value,
  * processes it, and return an output value as the result of the execution. This
  * is similar to the {@link Function} interface introduced with Java 8. If
- * invoked {@link #runBlocking(CoroutineScope, Object)}  blocking} it will
+ * invoked {@link #runBlocking(CoroutineScope, Object)} blocking} it will
  * behave exactly like a standard function, blocking the current thread until
  * the processing has finished and the result value has been produced. But if
- * invoked {@link #runAsync(CoroutineScope, Object)}  asynchronously} the
+ * invoked {@link #runAsync(CoroutineScope, Object)} asynchronously} the
  * coroutine will be executed in parallel to the current thread, suspending it's
  * execution shortly between processing steps or even pausing until data is
  * available.
@@ -136,14 +136,14 @@ import static org.obrel.type.StandardTypes.NAME;
  * (using a static import of first() may cause a compiler error (depending on
  * the Java version used):
  * </p>
- * <code>Coroutine&lt;String, String&gt; toUpper = first(apply(s ->
+ * <code>Coroutine&lt;String, String&gt; toUpper = first(apply(s -&gt;
  * s.toUpperCase()));</code>
  *
  * <p>
  * To make the code compile, the type of the lambda argument needs to be
  * declared explicitly:
  * </p>
- * <code>Coroutine&lt;String, String&gt; toUpper = first(apply((String s) ->
+ * <code>Coroutine&lt;String, String&gt; toUpper = first(apply((String s) -&gt;
  * s.toUpperCase()));</code>
  *
  * <p>
@@ -219,7 +219,7 @@ import static org.obrel.type.StandardTypes.NAME;
  * @author eso
  */
 public class Coroutine<I, O> extends RelatedObject
-	implements FluentRelatable<Coroutine<I, O>> {
+		implements FluentRelatable<Coroutine<I, O>> {
 
 	private StepChain<I, ?, O> code;
 
@@ -283,7 +283,7 @@ public class Coroutine<I, O> extends RelatedObject
 	 * @return The new coroutine
 	 */
 	public static <I, O> Coroutine<I, O> first(String stepName,
-		CoroutineStep<I, O> step) {
+			CoroutineStep<I, O> step) {
 		return first(step.with(NAME, stepName));
 	}
 
@@ -311,15 +311,13 @@ public class Coroutine<I, O> extends RelatedObject
 	 * @param scope The scope to run in
 	 * @param input The input value
 	 * @return A {@link Continuation} that provides access to the execution
-	 * result
+	 *         result
 	 */
 	public Continuation<O> runAsync(CoroutineScope scope, I input) {
 		Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
-		Continuation<O> aContinuation =
-			new Continuation<>(scope, aRunCoroutine);
+		Continuation<O> aContinuation = new Continuation<>(scope, aRunCoroutine);
 
-		CompletableFuture<I> fExecution =
-			CompletableFuture.supplyAsync(() -> input, aContinuation);
+		CompletableFuture<I> fExecution = CompletableFuture.supplyAsync(() -> input, aContinuation);
 
 		aRunCoroutine.code.runAsync(fExecution, null, aContinuation);
 
@@ -342,12 +340,11 @@ public class Coroutine<I, O> extends RelatedObject
 	 * @param scope The scope to run in
 	 * @param input The input value
 	 * @return A {@link Continuation} that provides access to the execution
-	 * result
+	 *         result
 	 */
 	public Continuation<O> runBlocking(CoroutineScope scope, I input) {
 		Coroutine<I, O> aRunCoroutine = new Coroutine<>(this);
-		Continuation<O> aContinuation =
-			new Continuation<>(scope, aRunCoroutine);
+		Continuation<O> aContinuation = new Continuation<>(scope, aRunCoroutine);
 
 		aRunCoroutine.code.runBlocking(input, aContinuation);
 
@@ -429,7 +426,7 @@ public class Coroutine<I, O> extends RelatedObject
 
 		if (other != null) {
 			ObjectRelations.copyRelations(other, this, true,
-				ifTypeNot(IMMUTABLE));
+					ifTypeNot(IMMUTABLE));
 		}
 	}
 
@@ -443,8 +440,8 @@ public class Coroutine<I, O> extends RelatedObject
 	 */
 	void terminate(Continuation<?> continuation) {
 		code.getLastStep()
-			.runAsync(CompletableFuture.supplyAsync(() -> null, continuation),
-				null, continuation);
+				.runAsync(CompletableFuture.supplyAsync(() -> null, continuation),
+						null, continuation);
 	}
 
 	/**
@@ -497,7 +494,7 @@ public class Coroutine<I, O> extends RelatedObject
 		 */
 		@Override
 		public void runAsync(CompletableFuture<I> previousExecution,
-			CoroutineStep<O, ?> nextStep, Continuation<?> continuation) {
+				CoroutineStep<O, ?> nextStep, Continuation<?> continuation) {
 			if (!continuation.isCancelled()) {
 				try {
 					continuation.trace(step);
@@ -532,7 +529,7 @@ public class Coroutine<I, O> extends RelatedObject
 					continuation.trace(step);
 
 					return next.execute(step.execute(input, continuation),
-						continuation);
+							continuation);
 				} catch (Throwable e) {
 					continuation.fail(e);
 
@@ -563,8 +560,7 @@ public class Coroutine<I, O> extends RelatedObject
 		 */
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		<R> StepChain<I, T, R> then(CoroutineStep<O, R> step) {
-			StepChain<I, T, R> aChainedInvocation =
-				new StepChain<>(this.step, null);
+			StepChain<I, T, R> aChainedInvocation = new StepChain<>(this.step, null);
 
 			if (next instanceof StepChain) {
 				// Chains need to be accessed as raw types because the
@@ -589,8 +585,7 @@ public class Coroutine<I, O> extends RelatedObject
 		 */
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		<R> StepChain<I, T, R> withLastStep(CoroutineStep<?, R> step) {
-			StepChain<I, T, R> aChainedInvocation =
-				new StepChain<>(this.step, null);
+			StepChain<I, T, R> aChainedInvocation = new StepChain<>(this.step, null);
 
 			if (next instanceof StepChain) {
 				// Chains need to be accessed as raw types because the

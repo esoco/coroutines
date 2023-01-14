@@ -1,22 +1,27 @@
 plugins {
     id "java-library"
-    id 'pl.allegro.tech.build.axion-release' version "$axionReleaseVersion"
+    id "pl.allegro.tech.build.axion-release" version "$axionReleaseVersion"
+    id "com.vanniktech.maven.publish" version "$mavenPublishVersion"
 }
-
-project.group = 'de.esoco'
-project.version = scmVersion.version
-
-sourceCompatibility = 1.8
 
 repositories {
-    mavenCentral()
-    jcenter()
+	mavenLocal()
+	mavenCentral()
 }
+
+scmVersion { tag { prefix.set("") }}
+
+
+project.version = scmVersion.version
+project.group = 'de.esoco'
+project.description = 'A pure Java implementation of coroutines'
+
+sourceCompatibility = 1.8
 
 dependencies {
     api "org.obrel:objectrelations:$obrelVersion"
 
-    implementation "org.reactivestreams:reactive-streams:$reactiveStreamsVersion"
+    //implementation "org.reactivestreams:reactive-streams:$reactiveStreamsVersion"
 
     testImplementation platform("org.junit:junit-bom:$junitVersion")
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -35,13 +40,34 @@ artifacts {
     archives javadocJar
 }
 
-tasks.withType(Javadoc) {
-    failOnError = false
-    options.addBooleanOption('quiet', true)
-
-    if (JavaVersion.current().isJava8Compatible()) {
-        options.addBooleanOption('Xdoclint:none', true)
-    }
-}
-
 test { useJUnitPlatform() }
+
+mavenPublishing {
+  coordinates("$project.group", "$project.name", "$project.version")
+
+  pom {
+    name = "$project.name"
+    description = "$project.description"
+    inceptionYear = "2018"
+    url = "https://github.com/esoco/${project.name}"
+    licenses {
+      license {
+        name = "The Apache License, Version 2.0"
+        url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        distribution = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+      }
+    }
+    developers {
+      developer {
+        id = "esoco"
+        name = "esoco GmbH"
+        url = "https://esoco.de/"
+      }
+    }
+    scm {
+      url = "https://github.com/esoco/${project.name}/"
+      connection = "scm:git:git://github.com/esoco/${project.name}.git"
+      developerConnection = "scm:git:ssh://git@github.com/esoco/${project.name}.git"
+    }
+  }
+}

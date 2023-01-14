@@ -43,8 +43,7 @@ public class Selection<T, V, R> extends Suspension<T> {
 
 	private final List<V> results = new ArrayList<>();
 
-	private final List<Continuation<? extends V>> continuations =
-		new ArrayList<>();
+	private final List<Continuation<? extends V>> continuations = new ArrayList<>();
 
 	private final RunLock stateLock = new RunLock();
 
@@ -70,9 +69,9 @@ public class Selection<T, V, R> extends Suspension<T> {
 	 *                       a collection of values
 	 */
 	private Selection(CoroutineStep<?, T> suspendingStep,
-		CoroutineStep<R, ?> resumeStep, Continuation<?> continuation,
-		Predicate<Continuation<?>> checkComplete,
-		Predicate<Continuation<?>> checkSelect, boolean singleValue) {
+			CoroutineStep<R, ?> resumeStep, Continuation<?> continuation,
+			Predicate<Continuation<?>> checkComplete,
+			Predicate<Continuation<?>> checkSelect, boolean singleValue) {
 		super(suspendingStep, null, continuation);
 
 		this.resumeSelectionStep = resumeStep;
@@ -93,12 +92,11 @@ public class Selection<T, V, R> extends Suspension<T> {
 	 * @return The new instance
 	 */
 	public static <T, V> Selection<T, V, Collection<V>> ofMultipleValues(
-		CoroutineStep<?, T> suspendingStep,
-		CoroutineStep<Collection<V>, ?> resumeStep,
-		Continuation<?> rContinuation, Predicate<Continuation<?>> checkComplete,
-		Predicate<Continuation<?>> checkSelect) {
-		Selection<T, V, Collection<V>> aSelection =
-			new Selection<>(suspendingStep, resumeStep, rContinuation,
+			CoroutineStep<?, T> suspendingStep,
+			CoroutineStep<Collection<V>, ?> resumeStep,
+			Continuation<?> rContinuation, Predicate<Continuation<?>> checkComplete,
+			Predicate<Continuation<?>> checkSelect) {
+		Selection<T, V, Collection<V>> aSelection = new Selection<>(suspendingStep, resumeStep, rContinuation,
 				checkComplete, checkSelect, false);
 
 		return aSelection;
@@ -115,10 +113,10 @@ public class Selection<T, V, R> extends Suspension<T> {
 	 * @return The new instance
 	 */
 	public static <T> Selection<T, T, T> ofSingleValue(
-		CoroutineStep<?, T> suspendingStep, CoroutineStep<T, ?> resumeStep,
-		Continuation<?> continuation, Predicate<Continuation<?>> checkSelect) {
+			CoroutineStep<?, T> suspendingStep, CoroutineStep<T, ?> resumeStep,
+			Continuation<?> continuation, Predicate<Continuation<?>> checkSelect) {
 		return new Selection<>(suspendingStep, resumeStep, continuation,
-			c -> true, checkSelect, true);
+				c -> true, checkSelect, true);
 	}
 
 	/**
@@ -137,8 +135,8 @@ public class Selection<T, V, R> extends Suspension<T> {
 		});
 
 		continuation.onFinish(this::continuationFinished)
-			.onCancel(this::continuationCancelled)
-			.onError(this::continuationFailed);
+				.onCancel(this::continuationCancelled)
+				.onError(this::continuationFailed);
 
 		if (finished) {
 			continuation.cancel();
@@ -171,7 +169,7 @@ public class Selection<T, V, R> extends Suspension<T> {
 	@Override
 	public String toString() {
 		return String.format("%s[%s -> %s]", getClass().getSimpleName(),
-			suspendingStep(), resumeSelectionStep);
+				suspendingStep(), resumeSelectionStep);
 	}
 
 	/**
@@ -180,7 +178,6 @@ public class Selection<T, V, R> extends Suspension<T> {
 	 *
 	 * @param continuation The finished continuation
 	 */
-	@SuppressWarnings("unchecked")
 	void continuationCancelled(Continuation<? extends V> continuation) {
 		stateLock.runLocked(() -> {
 			continuations.remove(continuation);
@@ -194,7 +191,6 @@ public class Selection<T, V, R> extends Suspension<T> {
 	 *
 	 * @param continuation The finished continuation
 	 */
-	@SuppressWarnings("unchecked")
 	void continuationFailed(Continuation<? extends V> continuation) {
 		stateLock.runLocked(() -> {
 			continuations.remove(continuation);
@@ -210,7 +206,6 @@ public class Selection<T, V, R> extends Suspension<T> {
 	 *
 	 * @param continuation The finished continuation
 	 */
-	@SuppressWarnings("unchecked")
 	void continuationFinished(Continuation<? extends V> continuation) {
 		stateLock.runLocked(() -> {
 			continuations.remove(continuation);
@@ -234,9 +229,7 @@ public class Selection<T, V, R> extends Suspension<T> {
 	void resumeAsync() {
 		// type safety is ensured by the factory methods
 		@SuppressWarnings("unchecked")
-		R result = (R) (singleValue ?
-			(results.size() >= 1 ? results.get(0) : null) :
-			results);
+		R result = (R) (singleValue ? (results.size() >= 1 ? results.get(0) : null) : results);
 
 		continuation().resumeAsync(resumeSelectionStep, result);
 	}

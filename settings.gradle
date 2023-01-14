@@ -1,1 +1,5 @@
 rootProject.name = "coroutines"
+
+if (new File("$rootDir/../objectrelations").exists()) {
+	includeBuild "../objectrelations"
+}
